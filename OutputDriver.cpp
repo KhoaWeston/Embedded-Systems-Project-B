@@ -7,13 +7,19 @@
 
 #include "OutputDriver.h"
 
-OutputDriver::OutputDriver(GPIO_TypeDef* givenPort0, GPIO_TypeDef* givenPort1){
-	port0 = givenPort0; // GPIOA
-	port1 = givenPort1; // GPIOB
+OutputDriver::OutputDriver(DAC_HandleTypeDef* hdac, uint32_t DAC_CHANNEL, uint32_t DAC_ALIGN){
+	dac_port = hdac;
+	dac_channel = DAC_CHANNEL;
+	dac_alignment = DAC_ALIGN;
 }
 
-void OutputDriver::update(int16_t){
-	;
+void OutputDriver::config(){
+	HAL_DAC_Init(dac_port);
+	HAL_DAC_Start(dac_port, dac_channel);
+}
+
+void OutputDriver::update(int16_t wave_step){
+	HAL_DAC_SetValue(dac_port, dac_channel, dac_alignment, wave_step);
 }
 
 

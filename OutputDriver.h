@@ -12,10 +12,13 @@
 
 class OutputDriver{
 private:
-	GPIO_TypeDef* port0; // for GPIOA
-	GPIO_TypeDef* port1; // for GPIOB
+	DAC_HandleTypeDef* dac_port;
+	uint32_t dac_channel;
+	uint32_t dac_alignment;
+
 public:
-	OutputDriver(GPIO_TypeDef*, GPIO_TypeDef*); // Stores the GPIO pin mappings
+	OutputDriver(DAC_HandleTypeDef*, uint32_t, uint32_t); // Stores the GPIO pin mappings
+	void config();
 	void update(int16_t);
 };
 
