@@ -9,6 +9,8 @@
 #define EMBEDDED_SYSTEMS_PROJECT_B_INPUTDRIVER_H_
 
 #include "main.h"
+#include <stdint.h>
+#include <stdio.h>
 
 class InputDriver{
 private:
