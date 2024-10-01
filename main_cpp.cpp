@@ -5,6 +5,11 @@
  *      Author: kcmartin
  */
 
+#include <stdint.h>
+#include <stdio.h>
+#include "main.h"
+#include "InputDriver.h"
 
+extern "C" void main_cpp(void){
 
-
+}
