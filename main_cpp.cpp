@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "main.h"
+#include "InputDriver.h"
 #include "OutputDriver.h"
 
 extern "C" void main_cpp(void){
@@ -17,4 +18,3 @@ extern "C" void main_cpp(void){
 		;
 	}
 }
-
