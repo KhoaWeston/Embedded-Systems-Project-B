@@ -14,22 +14,27 @@
 #define LUT_SIZE       			(128)
 #define M_PI					3.14159265
 
+enum wave_type{SINE, SAW, PULSE, TRI};
+
 
 class Wave{
 private:
-	uint32_t amplitude;
-	uint32_t dc_offset;
+	uint16_t amplitude;
+	uint16_t vert_offset;
+	uint16_t hor_offset;
 	uint32_t sine_wave_table[LUT_SIZE];
 	uint32_t sawtooth_wave_table[LUT_SIZE];
 	uint32_t tri_wave_table[LUT_SIZE];
 	uint32_t pulse_wave_table[LUT_SIZE];
+	uint8_t wave_index;
 public:
-	Wave(uint32_t amp, uint32_t offset);
-	void wave_build(void);
-	uint32_t* get_sine_wave_LUT(void);
-	uint32_t* get_sawtooth_wave_LUT(void);
-	uint32_t* get_pulse_wave_LUT(void);
-	uint32_t* get_tri_wave_LUT(void);
+	Wave(void);
+	void build_wave(uint16_t amp, uint16_t offset, wave_type, uint16_t);
+	void sine_wave_build(void);
+	void sawtooth_wave_build(void);
+	void tri_wave_build(void);
+	void pulse_wave_build(void);
+	uint32_t* get_wave_LUT(void);
 };
 
 

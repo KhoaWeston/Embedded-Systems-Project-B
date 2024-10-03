@@ -5,15 +5,15 @@
  *      Author: khoaw
  */
 
-#include <stdint.h>
-#include <stdio.h>
 #include "main.h"
+#include <DacOutputDriver.h>
+#include <DisplayOutputDriver.h>
 #include "Wave.h"
-#include <OutputDriverDAC.h>
-#include <OutputDriverDisplay.h>
 
 extern DAC_HandleTypeDef hdac1; // Declare DAC1
 extern TIM_HandleTypeDef htim2;
+//extern TIM_HandleTypeDef htim6;
+extern I2C_HandleTypeDef hi2c1;
 
 
 extern "C" void main_cpp(void){
@@ -23,3 +23,5 @@ extern "C" void main_cpp(void){
 
 	}
 }
+
+

@@ -1,27 +1,29 @@
 /*
- * OutputDriver.h
+ * DacOutputDriver.h
  *
- *  Created on: Sep 27, 2024
+ *  Created on: Oct 3, 2024
  *      Author: khoaw
  */
 
-#ifndef EMBEDDED_SYSTEMS_PROJECT_B_OUTPUTDRIVER_H_
-#define EMBEDDED_SYSTEMS_PROJECT_B_OUTPUTDRIVER_H_
+#ifndef INC_DACOUTPUTDRIVER_H_
+#define INC_DACOUTPUTDRIVER_H_
+
 
 #include "main.h"
 
 
-class OutputDriverDAC{
+class DACOutputDriver{
 private:
 	DAC_HandleTypeDef* dac_port; // Holds the specific DAC port
 	TIM_HandleTypeDef* tim_num;
 	uint32_t dac_channel; // Holds the corresponding DAC channel constant
 	uint32_t dac_alignment; // Holds the corresponding DAC alignment constant
+	uint16_t freq;
 
 public:
-	OutputDriverDAC(DAC_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t); // Initialize the DAC class members
+	DACOutputDriver(DAC_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint16_t); // Initialize the DAC class members
 	void update(uint32_t*, uint16_t); // Set the output value of the DAC
 };
 
 
-#endif /* EMBEDDED_SYSTEMS_PROJECT_B_OUTPUTDRIVER_H_ */
+#endif /* INC_DACOUTPUTDRIVER_H_ */
