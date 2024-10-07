@@ -6,14 +6,14 @@
  */
 
 #include "main.h"
-#include <DacOutputDriver.h>
-#include <DisplayOutputDriver.h>
+#include "DacOutputDriver.h"
 #include "Wave.h"
+#include "DisplayOutputDriver.h"
 
-extern DAC_HandleTypeDef hdac1; // Declare DAC1
-extern TIM_HandleTypeDef htim2;
-//extern TIM_HandleTypeDef htim6;
-extern I2C_HandleTypeDef hi2c1;
+extern DAC_HandleTypeDef hdac1; // Pull DAC object from main.c
+extern TIM_HandleTypeDef htim2; // Pull timer 2 object from main.c
+extern TIM_HandleTypeDef htim6; // Pull timer 6 object from main.c
+extern I2C_HandleTypeDef hi2c1; // Pull I2C object from main.c
 
 
 extern "C" void main_cpp(void){

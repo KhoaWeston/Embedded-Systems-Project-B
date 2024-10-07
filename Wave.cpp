@@ -8,21 +8,15 @@
 #include "Wave.h"
 
 
-Wave::Wave(void){
-	amplitude = 0;
-	vert_offset = 0;
-	wave_index = 0;
-	hor_offset = 0;
+Wave::Wave(wave_type type, uint16_t amp, uint16_t x_off){ // Initializes the Wave class attributes
+	amplitude = amp;
+	wave_index = type;
+	hor_offset = (x_off/100.)*LUT_SIZE;
 }
 
 
-void Wave::build_wave(uint16_t amp, uint16_t y_off, wave_type type, uint16_t x_off){
-	amplitude = amp;
-	vert_offset = y_off;
-	wave_index = type;
-	hor_offset = (x_off/100.)*LUT_SIZE;
-
-	switch(wave_index){
+void Wave::update_wave(void){
+	switch(wave_index){ // Builds specific wave table depending on user-specified wave type
 		case 0 : sine_wave_build(); break;
 		case 1 : sawtooth_wave_build(); break;
 		case 2 : pulse_wave_build(); break;
@@ -33,34 +27,38 @@ void Wave::build_wave(uint16_t amp, uint16_t y_off, wave_type type, uint16_t x_o
 
 
 void Wave::sine_wave_build(void){
-	for(uint8_t i = hor_offset; i < LUT_SIZE+hor_offset; i++){
-		sine_wave_table[i] = (vert_offset + amplitude * sin(2 * M_PI * i / LUT_SIZE));
+	for(uint8_t i = 0; i < LUT_SIZE; i++){
+		sine_wave_table[i] = amplitude * (sin(2 * M_PI * (i+hor_offset) / LUT_SIZE) + 1) + 50;
 	}
 }
 
 
 void Wave::sawtooth_wave_build(void){
-	for(uint8_t i = hor_offset; i < LUT_SIZE+hor_offset; i++){
-		sawtooth_wave_table[i] = (vert_offset + amplitude * (float)(-1. + (2. * ((double)i / (double)LUT_SIZE))));
-	}
+	for(uint8_t i = 0; i < LUT_SIZE; i++){
+		uint16_t idx = (i + hor_offset < LUT_SIZE) ? i + hor_offset : i - LUT_SIZE + hor_offset;
+		sawtooth_wave_table[i] = 2 * amplitude * (float)((float)idx / (LUT_SIZE - 1)) + 50;	}
 }
 
 
 void Wave::pulse_wave_build(void){
-	for(uint8_t i = hor_offset; i < LUT_SIZE+hor_offset; i++){
-		pulse_wave_table[i] = ((i < LUT_SIZE/2)? 2* amplitude/2+vert_offset : -amplitude/2+vert_offset);
+	for(uint8_t i = 0; i < LUT_SIZE; i++){
+		if(i < LUT_SIZE / 2 - hor_offset || i + hor_offset >= LUT_SIZE) {
+			pulse_wave_table[i] = 2 * amplitude + 50;
+		} else {
+			pulse_wave_table[i] = 50;
+		}
 	}
 }
 
 
 void Wave::tri_wave_build(void){
-	for(uint8_t i = hor_offset; i < LUT_SIZE+hor_offset; i++){
-		tri_wave_table[i] = ((i < LUT_SIZE/2)? (-(2*amplitude)/(LUT_SIZE/2)*i+amplitude+vert_offset) : (int)((float)(2 * amplitude) / (LUT_SIZE / 2) * (float)i - 2*amplitude));
-	}
+	for(uint8_t i = 0; i < LUT_SIZE; i++){
+		uint16_t idx = (i + hor_offset < LUT_SIZE) ? i + hor_offset : i - LUT_SIZE + hor_offset;
+		tri_wave_table[i] = abs((2 * amplitude) * (-(float)idx / (LUT_SIZE / 2) + 1)) + 50;	}
 }
 
 
-uint32_t* Wave::get_wave_LUT(void){
+uint32_t* Wave::get_wave_LUT(void){ // Returns the lookup table for the user-specified wave type
 	switch(wave_index){
 		case 0 : return sine_wave_table;
 		case 1 : return sawtooth_wave_table;
@@ -68,5 +66,20 @@ uint32_t* Wave::get_wave_LUT(void){
 		case 3 : return tri_wave_table;
 		default : return sine_wave_table;
 	}
+}
+
+
+uint16_t Wave::get_amp(void){
+	return amplitude;
+}
+
+
+uint16_t Wave::get_hor_off(void){
+	return hor_offset;
+}
+
+
+uint8_t Wave::get_type(void){
+	return wave_index;
 }
 
