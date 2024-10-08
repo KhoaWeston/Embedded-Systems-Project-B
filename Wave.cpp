@@ -8,18 +8,21 @@
 #include "Wave.h"
 
 
-Wave::Wave(wave_type type, uint16_t amp, uint16_t x_off){ // Initializes the Wave class attributes
-	amplitude = amp;
+Wave::Wave(wave_type type, uint8_t amp, uint8_t x_off /*, Queue* q*/){ // Initializes the Wave class attributes
 	wave_index = type;
-	hor_offset = (x_off/100.)*LUT_SIZE;
+	amplitude = (amp/8.)*2048;
+	hor_offset = (x_off/8.)*LUT_SIZE;
+	/*queue = q;*/
 }
 
 
 void Wave::update_wave(void){
+	// TODO: Dequeue the queue to make the appropriate changes to the attributes
+
 	switch(wave_index){ // Builds specific wave table depending on user-specified wave type
 		case 0 : sine_wave_build(); break;
 		case 1 : sawtooth_wave_build(); break;
-		case 2 : pulse_wave_build(); break;
+		case 2 : square_wave_build(); break;
 		case 3 : tri_wave_build(); break;
 		default : sine_wave_build(); break;
 	}
@@ -40,7 +43,7 @@ void Wave::sawtooth_wave_build(void){
 }
 
 
-void Wave::pulse_wave_build(void){
+void Wave::square_wave_build(void){
 	for(uint8_t i = 0; i < LUT_SIZE; i++){
 		if(i < LUT_SIZE / 2 - hor_offset || i + hor_offset >= LUT_SIZE) {
 			pulse_wave_table[i] = 2 * amplitude + 50;

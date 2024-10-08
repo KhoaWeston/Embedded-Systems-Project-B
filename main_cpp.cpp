@@ -6,8 +6,9 @@
  */
 
 #include "main.h"
+#include "Channel.h"
+#include "Controller.h"
 #include "InputDriver.h"
-#include "OutputDriver.h"
 #include "DacOutputDriver.h"
 #include "Wave.h"
 #include "DisplayOutputDriver.h"
