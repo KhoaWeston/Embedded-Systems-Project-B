@@ -21,18 +21,20 @@ void OutputDriverDisplay::config(void){
 
 
 // Update the OLED display for all current wave information
-void OutputDriverDisplay::update_display(uint8_t ch_num, uint8_t type, uint16_t freq, uint16_t amp, uint16_t h_off){
+void OutputDriverDisplay::update_display(uint8_t ch_num, Wave* wave1, Wave* wave2, uint16_t freq1, uint16_t freq2){
+	// TODO: Read a queue to decide what channel to display
+
 	ssd1306_SetCursor(0, 0);
-	display_wave_type(type);
+	display_wave_type((ch_num==1) ? wave1->get_type() : wave2->get_type());
 	ssd1306_SetCursor(90, 0);
 	display_channel(ch_num);
 	ssd1306_SetCursor(0, 20);
-	display_freq(freq);
+	display_freq((ch_num==1) ? freq1 : freq2);
 	ssd1306_SetCursor(0, 35);
-	display_amp(amp);
+	display_amp((ch_num==1) ? wave1->get_amp() : wave2->get_amp());
 	if(ch_num == 2){
 		ssd1306_SetCursor(0, 50);
-		display_hor_offset(h_off);
+		display_hor_offset((ch_num==1) ? wave1->get_hor_off() : wave2->get_hor_off());
 	}
 	ssd1306_UpdateScreen(i2c_num);
 }
@@ -48,7 +50,7 @@ void OutputDriverDisplay::display_wave_type(uint8_t type){ // Display user-speci
 	switch(type){
 		case 0 : wave_type_str = "Sine"; break;
 		case 1 : wave_type_str = "Saw"; break;
-		case 2 : wave_type_str = "Pulse"; break;
+		case 2 : wave_type_str = "Square"; break;
 		case 3 : wave_type_str = "Tri"; break;
 		default : wave_type_str = "Sine"; break;
 	}
