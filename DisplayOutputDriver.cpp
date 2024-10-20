@@ -8,78 +8,60 @@
 #include <DisplayOutputDriver.h>
 
 
-// Initialize the Display class attributes
-OutputDriverDisplay::OutputDriverDisplay(I2C_HandleTypeDef* i2c, Dis_queue* q){
-	i2c_num = i2c;
+DisplayOutputDriver::DisplayOutputDriver(I2C_HandleTypeDef* i2c, DisplayQueue* q){
+	i2c_handle = i2c;
 	queue = q;
-	ch_num=1;
-	FA_sel = 1;
+	curr_channel=1;
+	selected_mode = 1;
 }
 
 
-void OutputDriverDisplay::config(void){
-	ssd1306_Init(i2c_num); // Initialize the OLED
+// Initialize the OLED
+void DisplayOutputDriver::initialize_display(void){
+	ssd1306_Init(i2c_handle); // Initialize the OLED
 	ssd1306_Fill(Black); // Set the background black
-	ssd1306_SetCursor(0, 0);
-	display_wave_type(0);
-	ssd1306_SetCursor(90, 0);
-	display_channel();
-	ssd1306_SetCursor(0, 20);
-	display_freq(1250);
-	ssd1306_SetCursor(0, 35);
-	display_amp(1024);
-	ssd1306_SetCursor(0, 50);
-	display_hor_offset(false, 1);
-	ssd1306_UpdateScreen(i2c_num);
+	ssd1306_UpdateScreen(i2c_handle);
 }
 
 
 // Update the OLED display for all current wave information
-void OutputDriverDisplay::update_display(Wave* wave1, Wave* wave2, uint16_t freq1, uint16_t freq2){
-	bool FA_flag = queue->dequeue(&FA_sel, F_OR_A);
-	bool chan_flag = queue->dequeue(&ch_num, CHAN);
+void DisplayOutputDriver::update_display(Wave* wave1, Wave* wave2, uint16_t freq1, uint16_t freq2){
+	bool FA_flag = queue->dequeue(&selected_mode, F_OR_A); // Tells if selection has changed between frequency and amplitude
+	bool chan_flag = queue->dequeue(&curr_channel, CHAN); // Tells if selection has changed between channels
 
 	if(chan_flag || FA_flag){
 		ssd1306_SetCursor(0, 0);
-		display_wave_type((ch_num==1) ? wave1->get_type() : wave2->get_type());
+		display_wave_type((curr_channel==1) ? wave1->get_wave_type() : wave2->get_wave_type());
 		ssd1306_SetCursor(90, 0);
 		display_channel();
 		ssd1306_SetCursor(0, 20);
-		display_freq((ch_num==1) ? freq1 : freq2);
+		display_freq((curr_channel==1) ? freq1 : freq2);
 		ssd1306_SetCursor(0, 35);
-		display_amp((ch_num==1) ? wave1->get_amp() : wave2->get_amp());
+		display_amp((curr_channel==1) ? wave1->get_amplitude() : wave2->get_amplitude());
 		ssd1306_SetCursor(0, 50);
-		display_hor_offset(wave2->get_follow_mode(), wave2->get_hor_off());
-		ssd1306_UpdateScreen(i2c_num);
+		display_delay(wave2->is_follow_mode_active(), wave2->get_delay());
+		ssd1306_UpdateScreen(i2c_handle);
 	}
 }
 
 
-void OutputDriverDisplay::display_channel(){ // Display the channel most recently changed
-	ssd1306_WriteString(("Ch:"+std::to_string(ch_num)).c_str(), Font_7x10, Blue);
+// Display the channel most recently changed
+void DisplayOutputDriver::display_channel(){
+	ssd1306_WriteString(("Ch:"+std::to_string(curr_channel)).c_str(), Font_7x10, Blue);
 }
 
 
-void OutputDriverDisplay::display_wave_type(uint8_t type){ // Display user-specified wave type
-	std::string wave_type_str;
-	switch(type){
-		case 0 : wave_type_str = "Sine  "; break;
-		case 1 : wave_type_str = "Saw   "; break;
-		case 2 : wave_type_str = "Square"; break;
-		case 3 : wave_type_str = "Tri   "; break;
-		default : wave_type_str = "Sine  "; break;
-	}
+// Display the current wave type
+void DisplayOutputDriver::display_wave_type(uint8_t type){
+	static std::string wave_types[] = { "Sine  ", "Saw   ", "Square", "Tri   " };
 
-	ssd1306_WriteString(("Wave:"+wave_type_str).c_str(), Font_7x10, Blue);
+	ssd1306_WriteString(("Wave:"+wave_types[type]).c_str(), Font_7x10, Blue);
 }
 
 
-void OutputDriverDisplay::display_freq(uint16_t freq){ // Display frequency to 1 decimal point resolution
-	std::string sel_arrow = "";
-	if(FA_sel == 1){
-		sel_arrow = ">";
-	}
-
+// Display frequency to 1 decimal point resolution
+void DisplayOutputDriver::display_freq(uint32_t freq){
+	std::string sel_arrow = (selected_mode == 1) ? ">" : "";
 	std::string f_str = std::to_string(freq);
 	std::string thousandths = (f_str.size()==3) ? "0" : f_str.substr(0,f_str.size()-3);
 	std::string hundredths = f_str.substr(f_str.size()-3,1);
@@ -88,13 +70,11 @@ void OutputDriverDisplay::display_freq(uint16_t freq){ // Display frequency to 1
 }
 
 
-void OutputDriverDisplay::display_amp(uint16_t amp){ // Display the calculated amplitude
-	std::string sel_arrow = "";
-	if(FA_sel == 2){
-		sel_arrow = ">";
-	}
-
-	std::string a_str = std::to_string((int)(amp*(3300/2048.)));
+// Display the calculated amplitude
+void DisplayOutputDriver::display_amp(uint16_t amp){
+	std::string sel_arrow = (selected_mode == 2) ? ">" : "";
+	uint16_t calculated_amp = static_cast<uint16_t>(amp*(3300/2048.));
+	std::string a_str = std::to_string(calculated_amp);
 	std::string thousandths = (a_str.size()==3) ? "0" : a_str.substr(0,a_str.size()-3);
 	std::string hundredths = a_str.substr(a_str.size()-3,1);
 
@@ -102,11 +82,13 @@ void OutputDriverDisplay::display_amp(uint16_t amp){ // Display the calculated a
 }
 
 
-void OutputDriverDisplay::display_hor_offset(bool follow_mode, uint16_t h_off){ // Display the horizontal offset for CH2
-	if(ch_num == 1){
+// Display the delay for CH2 when in follower mode
+void DisplayOutputDriver::display_delay(bool follow_mode, uint16_t delay){
+	if(curr_channel == 1){
 		ssd1306_WriteString("                ", Font_7x10, Blue);
 	}else{
-		std::string offset = (follow_mode) ? std::to_string(h_off)+"% " : "NA ";
-		ssd1306_WriteString(("Delay: "+offset).c_str(), Font_7x10, Blue);
+		std::string del_str = (follow_mode) ? std::to_string(delay)+"% " : "NA ";
+		ssd1306_WriteString(("Delay: "+del_str).c_str(), Font_7x10, Blue);
 	}
 }
+
