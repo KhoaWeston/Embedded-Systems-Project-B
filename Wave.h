@@ -9,35 +9,48 @@
 #define INC_WAVE_H_
 
 #include "main.h"
+#include "Queue.h"
 #include <math.h>
 
-#define LUT_SIZE       			(128) 		// Lookup table size (i.e. resolution)
 #define M_PI					3.14159265
+#define LUT_SIZE       			(128) 	// Lookup table size (i.e. resolution)
+#define AMP_KNOB_STEPS			(8)		// Number of steps for amplitude knob
+#define DELAY_KNOB_STEPS		(8)
+#define VERT_OFFSET 			(50)	// Bottom and top wave buffer to ensure no clipping
 
-enum wave_type{SINE, SAW, SQUARE, TRI}; // wave type options
+enum WaveType{SINE, SAW, SQUARE, TRI}; // Wave type options
 
 
-class Wave{
+class Wave{ // @suppress("Miss copy constructor or assignment operator")
 private:
-	uint16_t amplitude; 						// Holds the user-specified amplitude
-	uint16_t hor_offset; 						// Holds the horizontal offset in 45 degree increments for CH2
-	uint32_t sine_wave_table[LUT_SIZE]; 		// Holds the sine wave table
-	uint32_t sawtooth_wave_table[LUT_SIZE]; 	// Holds the sawtooth wave table
-	uint32_t tri_wave_table[LUT_SIZE]; 			// Holds the triangle wave table
-	uint32_t pulse_wave_table[LUT_SIZE]; 		// Holds the pulse wave table
-	uint8_t wave_index; 						// Holds the user-specified wave type
-	/* Queue* queue; */							// Holds the instructions for what parameters to change
+	uint8_t curr_amp;
+	uint8_t delay; 								// Horizontal offset in 45 degree increments for CH2
+	WaveType curr_wave;
+
+	WaveQueue* queue;							// Instructions for parameter change
+	Wave* follower_wave;						// Reference to the other wave (for follower mode)
+	EventFlag* follow_mode_flag; 				// Flag for follow mode activation
+	EventFlag* wave_update_flag; 				// Flag for wave updates
+
+	uint32_t base_wave_tables[4][LUT_SIZE];		// General wave lookup tables (SINE, SAW, SQUARE, TRI)
+	uint32_t scaled_wave_tables[4][LUT_SIZE];	// Scaled wave lookup tables (SINE, SAW, SQUARE, TRI)
+
+	bool is_in_follow_mode;
+	uint32_t follow_wave_LUT[LUT_SIZE];			// Holds the adjusted wave when in follow mode
+	uint16_t follow_mode_amp; 					// Amplitude when in follow mode
+	WaveType follow_mode_wave;					// Holds the type of the wave in follow mode
+
+	void shift_follow_wave(void);
+	void scale_waves(void);					// Scale all general waves based on amplitude
 public:
-	Wave(wave_type, uint8_t, uint8_t /*, Queue**/); // Initializes the Wave class attributes
-	void update_wave(void); // Builds specific wave table depending on user-specified wave type
-	void sine_wave_build(void);
-	void sawtooth_wave_build(void);
-	void tri_wave_build(void);
-	void square_wave_build(void);
-	uint32_t* get_wave_LUT(void); // Returns the lookup table for the user-specified wave type
-	uint16_t get_amp(void);
-	uint16_t get_hor_off(void);
-	uint8_t get_type(void);
+	Wave(Wave*, WaveType, uint8_t, WaveQueue*, EventFlag*, EventFlag*);
+	void generate_waves(void); 				// Build all general and scaled waveforms
+	void update_wave_params(void); 			// Update wave parameters from queue
+	uint32_t* get_active_wave_LUT(void); 	// Return the current wave lookup table
+	uint16_t get_amplitude(void);
+	uint16_t get_delay(void);
+	WaveType get_wave_type(void);
+	bool is_follow_mode_active(void);
 };
 
 

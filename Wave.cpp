@@ -8,81 +8,136 @@
 #include "Wave.h"
 
 
-Wave::Wave(wave_type type, uint8_t amp, uint8_t x_off /*, Queue* q*/){ // Initializes the Wave class attributes
-	wave_index = type;
-	amplitude = (amp/8.)*2048;
-	hor_offset = (x_off/8.)*LUT_SIZE;
-	/*queue = q;*/
+Wave::Wave(Wave* w, WaveType type, uint8_t amp, WaveQueue* q, EventFlag* f1, EventFlag* f2){ // @suppress("Class members should be properly initialized")
+	curr_wave = type;
+	curr_amp = amp;
+	delay = 0;
+
+	queue = q;
+	follow_mode_flag = f1;
+	wave_update_flag = f2;
+
+	follower_wave = w;
+	is_in_follow_mode = false;
+	follow_mode_amp = 1;
+	follow_mode_wave = SINE;
 }
 
 
-void Wave::update_wave(void){
-	// TODO: Dequeue the queue to make the appropriate changes to the attributes
+void Wave::generate_waves(void){ // Build all general and scaled waveforms
+	const uint16_t max_amp = 2048;
 
-	switch(wave_index){ // Builds specific wave table depending on user-specified wave type
-		case 0 : sine_wave_build(); break;
-		case 1 : sawtooth_wave_build(); break;
-		case 2 : square_wave_build(); break;
-		case 3 : tri_wave_build(); break;
-		default : sine_wave_build(); break;
+	for(uint16_t i = 0; i < LUT_SIZE; i++){
+		base_wave_tables[SINE][i] = (max_amp - VERT_OFFSET) * (sin(2 * M_PI * i / LUT_SIZE) + 1); 			// Build sine
+		base_wave_tables[SAW][i] = 2 * (max_amp - VERT_OFFSET) * (float)i / (LUT_SIZE - 1); 					// Build sawtooth
+		base_wave_tables[SQUARE][i] = (i < LUT_SIZE / 2) ? 2 * (max_amp - VERT_OFFSET) : 0; 		// Build square
+		base_wave_tables[TRI][i] = abs((2 * (max_amp - VERT_OFFSET)) * (-(float)i / (LUT_SIZE / 2) + 1)) ; 	// Build triangle
 	}
+
+	scale_waves();
 }
 
 
-void Wave::sine_wave_build(void){
-	for(uint8_t i = 0; i < LUT_SIZE; i++){
-		sine_wave_table[i] = amplitude * (sin(2 * M_PI * (i+hor_offset) / LUT_SIZE) + 1) + 50;
+void Wave::update_wave_params(void){ // Update wave parameters from queue
+	uint8_t wave_change = 0;
+	uint8_t amp_change = 0;
+	uint8_t follow_mode_change = 0;
+	uint8_t delay_change = 0;
+
+	bool waveform_updated  = queue->dequeue(&wave_change, WAVE);
+	bool amp_updated = queue->dequeue(&amp_change, AMP);
+	bool follow_mode_updated = queue->dequeue(&follow_mode_change, FOLLOW);
+	bool delay_updated = queue->dequeue(&delay_change, DEL);
+
+	// Cycle through wave types
+	if(waveform_updated && wave_change == INC){
+		curr_wave = static_cast<WaveType>((curr_wave + 1) % 4);
+		wave_update_flag->set_flag();
 	}
-}
 
-
-void Wave::sawtooth_wave_build(void){
-	for(uint8_t i = 0; i < LUT_SIZE; i++){
-		uint16_t idx = (i + hor_offset < LUT_SIZE) ? i + hor_offset : i - LUT_SIZE + hor_offset;
-		sawtooth_wave_table[i] = 2 * amplitude * (float)((float)idx / (LUT_SIZE - 1)) + 50;	}
-}
-
-
-void Wave::square_wave_build(void){
-	for(uint8_t i = 0; i < LUT_SIZE; i++){
-		if(i < LUT_SIZE / 2 - hor_offset || i + hor_offset >= LUT_SIZE) {
-			pulse_wave_table[i] = 2 * amplitude + 50;
-		} else {
-			pulse_wave_table[i] = 50;
+	// Change amplitude of all wave tables
+	if(amp_updated){
+		if(amp_change == INC){
+			curr_amp = (curr_amp >= AMP_KNOB_STEPS) ? 1 : curr_amp+1;
+		}else if(amp_change == DEC){
+			curr_amp = (curr_amp <= 1) ? AMP_KNOB_STEPS : curr_amp-1;
 		}
+		wave_update_flag->set_flag();
+		scale_waves();
+	}
+
+	// Toggle follow mode
+	if(follow_mode_updated){
+		is_in_follow_mode = (follow_mode_change == INC) ? !is_in_follow_mode : is_in_follow_mode;
+		follow_mode_flag->set_flag();
+		wave_update_flag->set_flag();
+	}
+
+	// While in follow mode, if wave 1 changes, then change wave 2
+	if(wave_update_flag->is_flag_set() && is_in_follow_mode){
+		wave_update_flag->reset_flag();
+		follow_mode_amp = follower_wave->get_amplitude();
+		follow_mode_wave = follower_wave->get_wave_type();
+
+		shift_follow_wave();
+	}
+
+	// Adjust delay of wave 2 while in follow mode
+	if(delay_updated){
+		if(delay_change == INC){
+			delay = (delay == DELAY_KNOB_STEPS-1) ? 0 : delay+1;
+		}else if(delay_change == DEC){
+			delay = (delay == 0) ? DELAY_KNOB_STEPS-1 : delay-1;
+		}
+
+		shift_follow_wave();
 	}
 }
 
 
-void Wave::tri_wave_build(void){
-	for(uint8_t i = 0; i < LUT_SIZE; i++){
-		uint16_t idx = (i + hor_offset < LUT_SIZE) ? i + hor_offset : i - LUT_SIZE + hor_offset;
-		tri_wave_table[i] = abs((2 * amplitude) * (-(float)idx / (LUT_SIZE / 2) + 1)) + 50;	}
-}
+void Wave::shift_follow_wave(void){
+	uint32_t* copy_LUT = follower_wave->get_active_wave_LUT();
+	uint16_t delay_index = (delay/(float)DELAY_KNOB_STEPS)*LUT_SIZE;
 
-
-uint32_t* Wave::get_wave_LUT(void){ // Returns the lookup table for the user-specified wave type
-	switch(wave_index){
-		case 0 : return sine_wave_table;
-		case 1 : return sawtooth_wave_table;
-		case 2 : return pulse_wave_table;
-		case 3 : return tri_wave_table;
-		default : return sine_wave_table;
+	for (uint16_t i = 0; i < LUT_SIZE; i++){
+		follow_wave_LUT[i] = copy_LUT[(i + delay_index) % LUT_SIZE];
 	}
 }
 
 
-uint16_t Wave::get_amp(void){
-	return amplitude;
+void Wave::scale_waves(void){ // Scale all general waves based on amplitude
+	float scale_factor = curr_amp/(float)AMP_KNOB_STEPS;
+
+	for(uint16_t i = 0; i < LUT_SIZE; i++){
+		scaled_wave_tables[SINE][i] = base_wave_tables[SINE][i] * scale_factor + VERT_OFFSET;
+		scaled_wave_tables[SAW][i] = base_wave_tables[SAW][i] * scale_factor + VERT_OFFSET;
+		scaled_wave_tables[SQUARE][i] = base_wave_tables[SQUARE][i] * scale_factor + VERT_OFFSET;
+		scaled_wave_tables[TRI][i] = base_wave_tables[TRI][i] * scale_factor + VERT_OFFSET;
+	}
 }
 
 
-uint16_t Wave::get_hor_off(void){
-	return hor_offset;
+uint32_t* Wave::get_active_wave_LUT(void){ // Return the current wave lookup table
+	return (is_in_follow_mode) ? follow_wave_LUT : scaled_wave_tables[curr_wave];
 }
 
 
-uint8_t Wave::get_type(void){
-	return wave_index;
+uint16_t Wave::get_amplitude(void) {
+    return (is_in_follow_mode) ? follow_mode_amp : static_cast<uint16_t>((curr_amp / (float)AMP_KNOB_STEPS) * 2048);
+}
+
+
+uint16_t Wave::get_delay(void) {
+    return static_cast<uint16_t>((delay / (float)AMP_KNOB_STEPS) * 100);
+}
+
+
+WaveType Wave::get_wave_type(void) {
+    return (is_in_follow_mode) ? follow_mode_wave : curr_wave;
+}
+
+
+bool Wave::is_follow_mode_active(void){
+	return is_in_follow_mode;
 }
 
