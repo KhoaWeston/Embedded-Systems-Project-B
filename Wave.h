@@ -12,9 +12,11 @@
 #include "Queue.h"
 #include <math.h>
 
-#define LUT_SIZE       			(256) 	// Lookup table size (i.e. resolution)
 #define M_PI					3.14159265
+#define LUT_SIZE       			(128) 	// Lookup table size (i.e. resolution)
 #define AMP_KNOB_STEPS			(8)		// Number of steps for amplitude knob
+#define DELAY_KNOB_STEPS		(8)
+#define VERT_OFFSET 			(50)	// Bottom and top wave buffer to ensure no clipping
 
 enum WaveType{SINE, SAW, SQUARE, TRI}; // Wave type options
 
@@ -37,12 +39,14 @@ private:
 	uint32_t follow_wave_LUT[LUT_SIZE];			// Holds the adjusted wave when in follow mode
 	uint16_t follow_mode_amp; 					// Amplitude when in follow mode
 	WaveType follow_mode_wave;					// Holds the type of the wave in follow mode
+
+	void shift_follow_wave(void);
+	void scale_waves(void);					// Scale all general waves based on amplitude
 public:
 	Wave(Wave*, WaveType, uint8_t, WaveQueue*, EventFlag*, EventFlag*);
 	void generate_waves(void); 				// Build all general and scaled waveforms
 	void update_wave_params(void); 			// Update wave parameters from queue
 	uint32_t* get_active_wave_LUT(void); 	// Return the current wave lookup table
-	void scale_waves(void);					// Scale all general waves based on amplitude
 	uint16_t get_amplitude(void);
 	uint16_t get_delay(void);
 	WaveType get_wave_type(void);

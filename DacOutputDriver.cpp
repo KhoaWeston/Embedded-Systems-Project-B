@@ -25,8 +25,15 @@ DACOutputDriver::DACOutputDriver(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim,
 }
 
 
+void DACOutputDriver::initialize_timer(uint16_t LUT_SIZE){
+	uint32_t freq_Hz = (curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ;
+    timer_handle->Init.Period = static_cast<uint32_t>(SYS_CLOCK_FREQ / (LUT_SIZE * freq_Hz)) - 1;
+    HAL_TIM_Base_Init(timer_handle); // Reinitialize the timer with a new period
+}
+
+
 // Set the output value of the DAC via DMA
-void DACOutputDriver::update_DAC(bool follow_mode, uint32_t follow_f, uint32_t* wave_LUT, uint16_t LUT_size){
+void DACOutputDriver::update_DAC(bool follow_mode, uint32_t follow_f, uint32_t* wave_LUT, uint16_t LUT_SIZE){
 	uint8_t freq_change = 0;
 	bool freq_updated = queue->dequeue(&freq_change, FREQ);
 
@@ -39,6 +46,8 @@ void DACOutputDriver::update_DAC(bool follow_mode, uint32_t follow_f, uint32_t* 
 		}
 
 		freq_update_flag->set_flag();
+		uint32_t freq_Hz = (curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ;
+		reinitialize_timer(freq_Hz, LUT_SIZE);
 	}
 
 	// Turn on or off follow mode if change is sensed from wave class
@@ -52,31 +61,22 @@ void DACOutputDriver::update_DAC(bool follow_mode, uint32_t follow_f, uint32_t* 
 	if(freq_update_flag->is_flag_set() && follow_mode_active){
 		freq_update_flag->reset_flag();
 		follow_mode_freq = follow_f;
+		reinitialize_timer(follow_mode_freq, LUT_SIZE);
 	}
 
 	// If any change is made, restart the DAC
 	if(dac_update_flag->is_flag_set()){
 		dac_update_flag->reset_flag();
 
-		if(follow_mode_active){
-			reinitialize_timer(follow_mode_freq, LUT_size);
-		}else{
-			uint32_t freq_Hz = (curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ;
-			reinitialize_timer(freq_Hz, LUT_size);
-		}
-
-		for(uint16_t i = 0; i < LUT_size; i++){
-			curr_wave_LUT[i] = wave_LUT[i];
-		}
-
+		HAL_DAC_Stop_DMA(dac_handle, dac_channel);
 		HAL_TIM_Base_Start(timer_handle); // Start the timer
-		HAL_DAC_Start_DMA(dac_handle, dac_channel, (uint32_t*)curr_wave_LUT, LUT_size, dac_alignment); // Output wave table via DMA for corresponding DAC channel
+		HAL_DAC_Start_DMA(dac_handle, dac_channel, (uint32_t*)wave_LUT, LUT_SIZE, dac_alignment); // Output wave table via DMA for corresponding DAC channel
 	}
 }
 
 
-void DACOutputDriver::reinitialize_timer(uint32_t frequency, uint16_t LUT_size){
-    timer_handle->Init.Period = static_cast<uint32_t>(SYS_CLOCK_FREQ / (LUT_size * frequency)) - 1;
+void DACOutputDriver::reinitialize_timer(uint32_t frequency, uint16_t LUT_SIZE){
+    timer_handle->Init.Period = static_cast<uint32_t>(SYS_CLOCK_FREQ / (LUT_SIZE * frequency)) - 1;
     HAL_TIM_Base_Init(timer_handle); // Reinitialize the timer with a new period
 }
 

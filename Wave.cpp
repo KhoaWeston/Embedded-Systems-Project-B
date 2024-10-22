@@ -25,14 +25,13 @@ Wave::Wave(Wave* w, WaveType type, uint8_t amp, WaveQueue* q, EventFlag* f1, Eve
 
 
 void Wave::generate_waves(void){ // Build all general and scaled waveforms
-	const uint16_t vert_offset = 75;
-	const uint16_t max_amp = 2048-vert_offset;
+	const uint16_t max_amp = 2048;
 
 	for(uint16_t i = 0; i < LUT_SIZE; i++){
-		base_wave_tables[SINE][i] = max_amp * (sin(2 * M_PI * i / LUT_SIZE) + 1) + vert_offset; 			// Build sine
-		base_wave_tables[SAW][i] = 2 * max_amp * (float)i / (LUT_SIZE - 1) + vert_offset; 					// Build sawtooth
-		base_wave_tables[SQUARE][i] = (i < LUT_SIZE / 2) ? 2 * max_amp + vert_offset : vert_offset; 		// Build square
-		base_wave_tables[TRI][i] = abs((2 * max_amp) * (-(float)i / (LUT_SIZE / 2) + 1)) + vert_offset; 	// Build triangle
+		base_wave_tables[SINE][i] = (max_amp - VERT_OFFSET) * (sin(2 * M_PI * i / LUT_SIZE) + 1); 			// Build sine
+		base_wave_tables[SAW][i] = 2 * (max_amp - VERT_OFFSET) * (float)i / (LUT_SIZE - 1); 					// Build sawtooth
+		base_wave_tables[SQUARE][i] = (i < LUT_SIZE / 2) ? 2 * (max_amp - VERT_OFFSET) : 0; 		// Build square
+		base_wave_tables[TRI][i] = abs((2 * (max_amp - VERT_OFFSET)) * (-(float)i / (LUT_SIZE / 2) + 1)) ; 	// Build triangle
 	}
 
 	scale_waves();
@@ -80,39 +79,40 @@ void Wave::update_wave_params(void){ // Update wave parameters from queue
 		follow_mode_amp = follower_wave->get_amplitude();
 		follow_mode_wave = follower_wave->get_wave_type();
 
-		uint32_t* copy_LUT = follower_wave->get_active_wave_LUT();
-		for(uint16_t i = 0; i < LUT_SIZE; i++){
-			follow_wave_LUT[i] = copy_LUT[i];
-		}
+		shift_follow_wave();
 	}
 
 	// Adjust delay of wave 2 while in follow mode
 	if(delay_updated){
 		if(delay_change == INC){
-			delay = (delay == AMP_KNOB_STEPS-1) ? 0 : delay+1;
+			delay = (delay == DELAY_KNOB_STEPS-1) ? 0 : delay+1;
 		}else if(delay_change == DEC){
-			delay = (delay == 0) ? AMP_KNOB_STEPS-1 : delay-1;
+			delay = (delay == 0) ? DELAY_KNOB_STEPS-1 : delay-1;
 		}
 
-		uint32_t temp[LUT_SIZE];
-		uint16_t delay_index = (delay/8.)*LUT_SIZE;
-		for (uint16_t i = 0; i < LUT_SIZE; i++){ // Make a copy of table with delay adjustment
-			temp[i] = follow_wave_LUT[(i + delay_index) % LUT_SIZE];
-		}
-		for (uint16_t i = 0; i < LUT_SIZE; i++){ // Copy back into original table
-			follow_wave_LUT[i] = temp[i];
-		}
+		shift_follow_wave();
+	}
+}
+
+
+void Wave::shift_follow_wave(void){
+	uint32_t* copy_LUT = follower_wave->get_active_wave_LUT();
+	uint16_t delay_index = (delay/(float)DELAY_KNOB_STEPS)*LUT_SIZE;
+
+	for (uint16_t i = 0; i < LUT_SIZE; i++){
+		follow_wave_LUT[i] = copy_LUT[(i + delay_index) % LUT_SIZE];
 	}
 }
 
 
 void Wave::scale_waves(void){ // Scale all general waves based on amplitude
 	float scale_factor = curr_amp/(float)AMP_KNOB_STEPS;
+
 	for(uint16_t i = 0; i < LUT_SIZE; i++){
-		scaled_wave_tables[SINE][i] = base_wave_tables[SINE][i] * scale_factor;
-		scaled_wave_tables[SAW][i] = base_wave_tables[SAW][i] * scale_factor;
-		scaled_wave_tables[SQUARE][i] = base_wave_tables[SQUARE][i] * scale_factor;
-		scaled_wave_tables[TRI][i] = base_wave_tables[TRI][i] * scale_factor;
+		scaled_wave_tables[SINE][i] = base_wave_tables[SINE][i] * scale_factor + VERT_OFFSET;
+		scaled_wave_tables[SAW][i] = base_wave_tables[SAW][i] * scale_factor + VERT_OFFSET;
+		scaled_wave_tables[SQUARE][i] = base_wave_tables[SQUARE][i] * scale_factor + VERT_OFFSET;
+		scaled_wave_tables[TRI][i] = base_wave_tables[TRI][i] * scale_factor + VERT_OFFSET;
 	}
 }
 
