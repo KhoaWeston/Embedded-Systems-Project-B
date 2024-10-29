@@ -8,18 +8,21 @@
 #include "Queue.h"
 
 
-Queue::queueConstruct(){
+void Queue::queueConstruct(){
 	tail=0;
-	buffer=0;
+	head=0;
+	for(uint8_t i=0; i<Q_SIZE; i++){
+		buffer[i]=0;
+	}
 }
 
-Queue::enqueue(int32_t value){
+bool Queue::enqueue(int32_t value){
 	if(tail<Q_SIZE){
 		buffer[tail] = value;
 		tail++;
 		return true;
 	}
-	else if(tail==Q_size){
+	else if(tail==Q_SIZE){
 		buffer[tail]=value;
 		tail=0;
 		return true;
@@ -29,7 +32,7 @@ Queue::enqueue(int32_t value){
 	}
 }
 
-Queue::dequeue(int32_t& value){
+bool Queue::dequeue(int32_t& value){
 	if(head>0){
 		value = buffer[head];
 		head--;
@@ -37,7 +40,8 @@ Queue::dequeue(int32_t& value){
 	}
 	else if(head ==0){
 		value = buffer[head];
-		head=Q_size;
+		head=Q_SIZE;
+		return true;
 	}
 	else{
 		return false;
