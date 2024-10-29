@@ -90,8 +90,9 @@ void DACOutputDriver::IndDAC::setup(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* t
 	freq_update_flag = f;
 
 	wave_queue->dequeue(l_num, lut_point);		// Load the waveform data
-	HAL_TIM_Base_Start(tim_handle); 			// Start the timer
 	reinitialize_timer(curr_freq_Hz);			// Set the initial frequency
+	HAL_TIM_Base_Start(tim_handle); 			// Start the timer
+	restart_DAC();
 }
 
 

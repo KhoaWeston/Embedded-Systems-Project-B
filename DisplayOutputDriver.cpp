@@ -100,7 +100,7 @@ void DisplayOutputDriver::update_display(){
 // Display the selected channel
 void DisplayOutputDriver::display_channel(){
 	ssd1306_SetCursor(90, 0);
-	ssd1306_WriteString(("Ch:"+std::to_string(curr_channel)).c_str(), Font_7x10, Blue);
+	ssd1306_WriteString(("Ch:"+std::to_string(curr_channel)).c_str());
 }
 
 
@@ -110,7 +110,7 @@ void DisplayOutputDriver::display_wave_type(){
 	std::string wave_str = (curr_channel == 1) ? wave_types[wave_type1] : wave_types[wave_type2];
 
 	ssd1306_SetCursor(0, 0);
-	ssd1306_WriteString(("Wave:"+wave_str).c_str(), Font_7x10, Blue);
+	ssd1306_WriteString(("Wave:"+wave_str).c_str());
 }
 
 
@@ -123,7 +123,7 @@ void DisplayOutputDriver::display_freq(){
 	std::string hundredths = f_str.substr(f_str.size()-3,1);
 
 	ssd1306_SetCursor(0, 20);
-	ssd1306_WriteString((sel_arrow+"Freq.: "+thousandths+"."+hundredths+"kHz  ").c_str(), Font_7x10, Blue);
+	ssd1306_WriteString((sel_arrow+"Freq.: "+thousandths+"."+hundredths+"kHz  ").c_str());
 }
 
 
@@ -136,7 +136,7 @@ void DisplayOutputDriver::display_amp(){
 	std::string hundredths = a_str.substr(a_str.size()-3,1);
 
 	ssd1306_SetCursor(0, 35);
-	ssd1306_WriteString((sel_arrow+"Amp.: "+thousandths+"."+hundredths+"V  ").c_str(), Font_7x10, Blue);
+	ssd1306_WriteString((sel_arrow+"Amp.: "+thousandths+"."+hundredths+"V  ").c_str());
 }
 
 
@@ -145,9 +145,9 @@ void DisplayOutputDriver::display_delay(){
 	ssd1306_SetCursor(0, 50);
 	if(curr_channel == 2){
 		std::string del_str = (follow_mode) ? std::to_string(delay)+"% " : "NA  ";
-		ssd1306_WriteString(("Delay: "+del_str).c_str(), Font_7x10, Blue);
+		ssd1306_WriteString(("Delay: "+del_str).c_str());
 	}else{
-		ssd1306_WriteString("                ", Font_7x10, Blue);
+		ssd1306_WriteString("                ");
 	}
 }
 

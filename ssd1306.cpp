@@ -8,20 +8,14 @@ static uint8_t SSD1306_Buffer[SSD1306_WIDTH * SSD1306_HEIGHT / 8];
 static SSD1306_t SSD1306;
 
 
-//
 //  Send a byte to the command register
-//
-static uint8_t ssd1306_WriteCommand(I2C_HandleTypeDef *hi2c, uint8_t command)
-{
+static uint8_t ssd1306_WriteCommand(I2C_HandleTypeDef *hi2c, uint8_t command){
     return HAL_I2C_Mem_Write(hi2c, SSD1306_I2C_ADDR, 0x00, 1, &command, 1, 10);
 }
 
 
-//
 //  Initialize the oled screen
-//
-uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c)
-{
+uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c){
     // Wait for the screen to boot
     HAL_Delay(100);
     int status = 0;
@@ -52,7 +46,7 @@ uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c)
     status += ssd1306_WriteCommand(hi2c, 0x22);
 
     status += ssd1306_WriteCommand(hi2c, 0xDA);   // Set com pins hardware configuration
-    status += ssd1306_WriteCommand(hi2c, SSD1306_COM_LR_REMAP << 5 | SSD1306_COM_ALTERNATIVE_PIN_CONFIG << 4 | 0x02);   
+    status += ssd1306_WriteCommand(hi2c, SSD1306_COM_LR_REMAP << 5 | SSD1306_COM_ALTERNATIVE_PIN_CONFIG << 4 | 0x02);
 
     status += ssd1306_WriteCommand(hi2c, 0xDB);   // Set vcomh
     status += ssd1306_WriteCommand(hi2c, 0x20);   // 0x20,0.77xVcc
@@ -65,7 +59,9 @@ uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c)
     }
 
     // Clear screen
-    ssd1306_Fill(Black);
+    for(uint32_t i = 0; i < sizeof(SSD1306_Buffer); i++){
+		SSD1306_Buffer[i] = 0x00;
+	}
 
     // Flush buffer to screen
     ssd1306_UpdateScreen(hi2c);
@@ -79,28 +75,10 @@ uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c)
     return 0;
 }
 
-//
-//  Fill the whole screen with the given color
-//
-void ssd1306_Fill(SSD1306_COLOR color)
-{
-    // Fill screenbuffer with a constant value (color)
-    uint32_t i;
 
-    for(i = 0; i < sizeof(SSD1306_Buffer); i++)
-    {
-        SSD1306_Buffer[i] = (color == Black) ? 0x00 : 0xFF;
-    }
-}
-
-//
 //  Write the screenbuffer with changed to the screen
-//
-void ssd1306_UpdateScreen(I2C_HandleTypeDef *hi2c)
-{
-    uint8_t i;
-
-    for (i = 0; i < 8; i++) {
+void ssd1306_UpdateScreen(I2C_HandleTypeDef *hi2c){
+    for (uint8_t i = 0; i < 8; i++) {
         ssd1306_WriteCommand(hi2c, 0xB0 + i);
         ssd1306_WriteCommand(hi2c, 0x00);
         ssd1306_WriteCommand(hi2c, 0x10);
@@ -109,90 +87,64 @@ void ssd1306_UpdateScreen(I2C_HandleTypeDef *hi2c)
     }
 }
 
-//
+
 //  Draw one pixel in the screenbuffer
-//  X => X Coordinate
-//  Y => Y Coordinate
-//  color => Pixel color
-//
-void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color)
-{
-    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT)
-    {
+void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color){
+    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT){
         // Don't write outside the buffer
         return;
     }
 
-    // Check if pixel should be inverted
-    if (SSD1306.Inverted)
-    {
-        color = (SSD1306_COLOR)!color;
-    }
+	uint16_t index = x + (y / 8) * SSD1306_WIDTH;
+	uint8_t bit_mask = 1 << (y % 8);
 
-    // Draw in the correct color
-    if (color == Blue)
-    {
-        SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] |= 1 << (y % 8);
-    }
-    else
-    {
-        SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] &= ~(1 << (y % 8));
-    }
+	if (color != SSD1306.Inverted) {
+		SSD1306_Buffer[index] |= bit_mask; // Set pixel
+	} else {
+		SSD1306_Buffer[index] &= ~bit_mask; // Clear pixel
+	}
 }
 
 
 //
 //  Draw 1 char to the screen buffer
 //  ch      => Character to write
-//  Font    => Font to use
-//  color   => Black or White
 //
-char ssd1306_WriteChar(char ch, FontDef Font, SSD1306_COLOR color)
+char ssd1306_WriteChar(char ch)
 {
-    uint32_t i, b, j;
+    uint32_t b;
 
     // Check remaining space on current line
-    if (SSD1306_WIDTH <= (SSD1306.CurrentX + Font.FontWidth) ||
-        SSD1306_HEIGHT <= (SSD1306.CurrentY + Font.FontHeight))
-    {
+    if (SSD1306_WIDTH <= (SSD1306.CurrentX + FONT_WIDTH) || SSD1306_HEIGHT <= (SSD1306.CurrentY + FONT_HEIGHT)) {
         // Not enough space on current line
         return 0;
     }
 
     // Translate font to screenbuffer
-    for (i = 0; i < Font.FontHeight; i++)
-    {
-        b = Font.data[(ch - 32) * Font.FontHeight + i];
-        for (j = 0; j < Font.FontWidth; j++)
-        {
-            if ((b << j) & 0x8000)
-            {
-                ssd1306_DrawPixel(SSD1306.CurrentX + j, (SSD1306.CurrentY + i), (SSD1306_COLOR) color);
-            }
-            else
-            {
-                ssd1306_DrawPixel(SSD1306.CurrentX + j, (SSD1306.CurrentY + i), (SSD1306_COLOR)!color);
+    for (uint32_t i = 0; i < FONT_HEIGHT; i++){
+        b = Font7x10[(ch - 32) * FONT_HEIGHT + i];
+        for (uint32_t j = 0; j < FONT_WIDTH; j++) {
+            if ((b << j) & 0x8000){
+                ssd1306_DrawPixel(SSD1306.CurrentX + j, (SSD1306.CurrentY + i), Blue);
+            }else{
+                ssd1306_DrawPixel(SSD1306.CurrentX + j, (SSD1306.CurrentY + i), Black);
             }
         }
     }
 
     // The current space is now taken
-    SSD1306.CurrentX += Font.FontWidth;
+    SSD1306.CurrentX += FONT_WIDTH;
 
     // Return written char for validation
     return ch;
 }
 
-//
+
 //  Write full string to screenbuffer
-//
-char ssd1306_WriteString(const char* str, FontDef Font, SSD1306_COLOR color)
-{
+char ssd1306_WriteString(const char* str){
     // Write until null-byte
-    while (*str)
-    {
-        if (ssd1306_WriteChar(*str, Font, color) != *str)
-        {
+    while (*str){
+        if (ssd1306_WriteChar(*str) != *str){
             // Char could not be written
             return *str;
         }
@@ -205,19 +157,9 @@ char ssd1306_WriteString(const char* str, FontDef Font, SSD1306_COLOR color)
     return *str;
 }
 
-//
-//  Invert background/foreground colors
-//
-void ssd1306_InvertColors(void)
-{
-    SSD1306.Inverted = !SSD1306.Inverted;
-}
 
-//
 //  Set cursor position
-//
-void ssd1306_SetCursor(uint8_t x, uint8_t y)
-{
+void ssd1306_SetCursor(uint8_t x, uint8_t y){
     SSD1306.CurrentX = x;
     SSD1306.CurrentY = y;
 }
