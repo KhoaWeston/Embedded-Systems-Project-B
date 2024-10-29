@@ -19,8 +19,9 @@ public:
 	bool enqueue(uint8_t type, int32_t value);
 	bool dequeue(uint8_t type, int32_t& value);
 private:
-	int32_t buffer[Q_SIZE][5];
+	int32_t buffer[Q_SIZE];
 	int32_t tail=0;
+	int32_t head=0;
 };
 
 
