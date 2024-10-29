@@ -35,11 +35,13 @@ bool Queue::enqueue(int32_t value){
 bool Queue::dequeue(int32_t& value){
 	if(head>0){
 		value = buffer[head];
+		buffer[head]=0;
 		head--;
 		return true;
 	}
-	else if(head ==0){
+	else if(head==0){
 		value = buffer[head];
+		buffer[head]=0;
 		head=Q_SIZE;
 		return true;
 	}
