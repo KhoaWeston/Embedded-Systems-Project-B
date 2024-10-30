@@ -8,29 +8,125 @@
 #include "DacOutputDriver.h"
 
 
-// Assign the DAC class members
-DACOutputDriver::DACOutputDriver(DAC_HandleTypeDef* hdac, TIM_HandleTypeDef* htim, uint32_t DAC_CHANNEL, uint32_t DAC_ALIGN, uint8_t f /*, Queue* q*/){
-	dac_port = hdac;
-	tim_num = htim;
-	dac_channel = DAC_CHANNEL;
-	dac_alignment = DAC_ALIGN;
-	freq = (f/8.)*10000;
-	/*queue = q;*/
+DACOutputDriver::DACOutputDriver(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim1, TIM_HandleTypeDef* tim2, // @suppress("Class members should be properly initialized")
+		uint32_t chan1, uint32_t chan2, uint32_t align, Queue* q1, LUTQueue* q2, Queue* q3, uint16_t s){
+	ID_queue = q1;
+	wave_queue = q2;
+	dis_queue = q3;
+
+	follow_mode_active = false;
+
+	// Initialize DAC channels with setup parameters
+	dac_ch1.setup(dac, tim1, chan1, align, s, q1, q2, &freq1_update_flag, LUT1);
+	dac_ch2.setup(dac, tim2, chan2, align, s, q1, q2, &freq2_update_flag, LUT2);
+
+	// Initialize display with starting frequencies
+	dis_queue->enqueue(FREQ1_1, dac_ch1.get_freq());
+	dis_queue->enqueue(FREQ2_1, dac_ch2.get_freq());
 }
 
 
 // Set the output value of the DAC via DMA
-void DACOutputDriver::update_DAC(uint32_t* wave_LUT, uint16_t LUT_size){
-	// TODO: Dequeue from queue to get instructions for setting frequency
+void DACOutputDriver::update_DAC(void){
+	// Update frequency of each DAC channel
+	dac_ch1.update_freq(FREQ1_0);
+	dac_ch2.update_freq(FREQ2_0);
 
-	tim_num->Init.Period = (int)(8e+7/(LUT_size*freq))-1; // Set the period value of the corresponding DAC trigger timer given a desired frequency
-	HAL_TIM_Base_Init(tim_num); // Reinitialize the timer
+	uint32_t follow_mode_change;
 
-	HAL_TIM_Base_Start(tim_num); // Start the timer
-	HAL_DAC_Start_DMA(dac_port, dac_channel, wave_LUT, LUT_size, dac_alignment); // Output wave table via DMA for corresponding DAC channel
+	// Handle channels if follow mode is toggled
+	if(ID_queue->dequeue(FOLLOW_1, follow_mode_change)){
+		follow_mode_active = (follow_mode_change == MODE_ON);
+		freq2_update_flag.set_flag();
+	}
+
+	// If channels are changed, sync DACs and update displays with new frequencies
+	if(freq1_update_flag.is_flag_set()){
+		freq1_update_flag.reset_flag();
+
+		// Reinitialize channel 2 timer if frequency channel 1 is adjusted in follower mode
+		if(follow_mode_active){
+			dac_ch2.reinitialize_timer(dac_ch1.get_freq());
+			freq2_update_flag.set_flag();
+		}else{
+			dac_ch1.restart_DAC();
+			dac_ch2.restart_DAC();
+		}
+
+		dis_queue->enqueue(FREQ1_1, dac_ch1.get_freq());
+	}
+
+	if(freq2_update_flag.is_flag_set()){
+		freq2_update_flag.reset_flag();
+
+		dac_ch1.restart_DAC();
+		dac_ch2.restart_DAC();
+
+		if(follow_mode_active){
+			dis_queue->enqueue(FREQ2_1, dac_ch1.get_freq());
+		}else{
+			dis_queue->enqueue(FREQ2_1, dac_ch2.get_freq());
+		}
+	}
 }
 
 
-uint32_t DACOutputDriver::get_freq(void){
-	return freq;
+DACOutputDriver::IndDAC::IndDAC(){ // @suppress("Class members should be properly initialized")
+	curr_freq = 1;
+	curr_freq_Hz = static_cast<uint32_t>((curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ);
 }
+
+
+void DACOutputDriver::IndDAC::setup(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim, uint32_t chan, uint32_t align, uint16_t s, Queue* q, LUTQueue* q2, EventFlag* f, uint8_t l_num){
+	dac_handle = dac;
+	tim_handle = tim;
+	dac_channel = chan;
+	dac_alignment = align;
+
+	lut_size = s;
+
+	queue = q;
+	wave_queue = q2;
+	freq_update_flag = f;
+
+	wave_queue->dequeue(l_num, lut_point);		// Load the waveform data
+	reinitialize_timer(curr_freq_Hz);			// Set the initial frequency
+	HAL_TIM_Base_Start(tim_handle); 			// Start the timer
+	restart_DAC();
+}
+
+
+void DACOutputDriver::IndDAC::update_freq(uint8_t f_num){
+	uint32_t freq_change;
+
+	// Adjust the timer frequency
+	if(queue->dequeue(f_num, freq_change)){
+		if(freq_change == INC){
+			curr_freq = (curr_freq == FREQ_KNOB_STEPS) ? 1 : curr_freq+1;
+		}else if(freq_change == DEC){
+			curr_freq = (curr_freq == 1) ? FREQ_KNOB_STEPS : curr_freq-1;
+		}
+
+		freq_update_flag->set_flag();
+		curr_freq_Hz = static_cast<uint32_t>((curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ);
+		reinitialize_timer(curr_freq_Hz);
+	}
+}
+
+
+void DACOutputDriver::IndDAC::restart_DAC(void){
+	HAL_DAC_Stop_DMA(dac_handle, dac_channel);
+	HAL_DAC_Start_DMA(dac_handle, dac_channel, lut_point, lut_size, dac_alignment);
+}
+
+void DACOutputDriver::IndDAC::reinitialize_timer(uint32_t frequency){
+    uint32_t tim_period = SYS_CLOCK_FREQ / (lut_size * frequency) - 1;
+    tim_handle->Instance->ARR = tim_period;
+    tim_handle->Init.Period = tim_period;
+}
+
+
+uint32_t DACOutputDriver::IndDAC::get_freq(void){
+    return curr_freq_Hz;
+}
+

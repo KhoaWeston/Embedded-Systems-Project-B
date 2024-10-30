@@ -8,27 +8,35 @@
 #ifndef INC_DISPLAYOUTPUTDRIVER_H_
 #define INC_DISPLAYOUTPUTDRIVER_H_
 
-
 #include "main.h"
 #include "fonts.h"
 #include "ssd1306.h"
-#include <string>
+#include "Queue.h"
 #include "math.h"
-#include "Wave.h"
+#include <string>
 
 
-class OutputDriverDisplay{ // @suppress("Miss copy constructor or assignment operator")
+class DisplayOutputDriver{ // @suppress("Miss copy constructor or assignment operator")
 private:
-	I2C_HandleTypeDef* i2c_num; 	// Holds the I2C object
+	I2C_HandleTypeDef* i2c_handle; 				// I2C handle for the OLED
+	Queue* ID_queue, *wave_queue, *DAC_queue;	// Queues for updating values to display
+
+	// Stores channel 1 and 2 values
+	uint32_t selected_mode;						// Tells if frequency or amplitude is selected
+	uint32_t curr_channel;						// Tells the current channel # that is selected
+	uint32_t amp1, amp2, wave_type1, wave_type2, freq1, freq2, delay;
+	bool follow_mode;							// Indicates if follow mode is active
+
+	// OLED display functions
+	void display_channel(void); 				// Display current channel
+	void display_wave_type(void);				// Display current wave type
+	void display_freq(void); 					// Display current frequency
+	void display_amp(void);						// Display current amplitude
+	void display_delay(void);					// Display current delay for CH2
+	void initialize_display(void); 				// Initialize OLED with initial values
 public:
-	OutputDriverDisplay(I2C_HandleTypeDef*); 	// Initialize the Display class attributes
-	void config(void); 							// Initialize the OLED
-	void update_display(uint8_t, Wave*, Wave*, uint16_t, uint16_t); 	// Update the OLED display for all current wave information
-	void display_channel(uint8_t); 				// Display the channel most recently changed
-	void display_wave_type(uint8_t);				// Display user-specified wave type
-	void display_freq(uint16_t); 					// Display frequency to 1 decimal point resolution
-	void display_amp(uint16_t);						// Display the calculated amplitude
-	void display_hor_offset(uint16_t);				// Display the horizontal offset for CH2
+	DisplayOutputDriver(I2C_HandleTypeDef*, Queue*, Queue*, Queue*);	// Constructor
+	void update_display(void); 	// Update the OLED with latest wave parameters
 };
 
 
