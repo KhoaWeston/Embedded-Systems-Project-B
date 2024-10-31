@@ -10,15 +10,15 @@
 
 #include "main.h"
 #include <iostream>
-#define Q_SIZE 20
+#define Q_SIZE 10
 
 class Queue{
 public:
 	void queueConstruct();
-	bool enqueue(int32_t value);
-	bool dequeue(int32_t& value);
+	bool enqueue(int32_t type, int32_t value);
+	bool dequeue(int32_t type, int32_t& value);
 private:
-	int32_t buffer[Q_SIZE];
+	int32_t buffer[Q_SIZE][6];
 	int32_t tail=0;
 	int32_t head=0;
 };
