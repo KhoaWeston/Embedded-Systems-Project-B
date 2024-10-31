@@ -9,15 +9,14 @@
 #define INC_DISPLAYOUTPUTDRIVER_H_
 
 #include "main.h"
-#include "fonts.h"
 #include "ssd1306.h"
 #include "Queue.h"
-#include "math.h"
 #include <string>
 
 
 class DisplayOutputDriver{ // @suppress("Miss copy constructor or assignment operator")
 private:
+	OledI2CDriver OLED;
 	I2C_HandleTypeDef* i2c_handle; 				// I2C handle for the OLED
 	Queue* ID_queue, *wave_queue, *DAC_queue;	// Queues for updating values to display
 
@@ -36,7 +35,7 @@ private:
 	void initialize_display(void); 				// Initialize OLED with initial values
 public:
 	DisplayOutputDriver(I2C_HandleTypeDef*, Queue*, Queue*, Queue*);	// Constructor
-	void update_display(void); 	// Update the OLED with latest wave parameters
+	void update_display(void); 					// Update the OLED with latest wave parameters
 };
 
 

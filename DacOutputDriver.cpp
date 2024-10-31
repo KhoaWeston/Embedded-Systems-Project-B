@@ -46,7 +46,6 @@ void DACOutputDriver::update_DAC(void){
 
 		// Reinitialize channel 2 timer if frequency channel 1 is adjusted in follower mode
 		if(follow_mode_active){
-			dac_ch2.reinitialize_timer(dac_ch1.get_freq());
 			freq2_update_flag.set_flag();
 		}else{
 			dac_ch1.restart_DAC();
@@ -59,21 +58,20 @@ void DACOutputDriver::update_DAC(void){
 	if(freq2_update_flag.is_flag_set()){
 		freq2_update_flag.reset_flag();
 
+		if(follow_mode_active){
+			dac_ch2.reinitialize_timer(dac_ch1.get_freq_idx());
+		}
+
 		dac_ch1.restart_DAC();
 		dac_ch2.restart_DAC();
 
-		if(follow_mode_active){
-			dis_queue->enqueue(FREQ2_1, dac_ch1.get_freq());
-		}else{
-			dis_queue->enqueue(FREQ2_1, dac_ch2.get_freq());
-		}
+		dis_queue->enqueue(FREQ2_1, dac_ch2.get_freq());
 	}
 }
 
 
 DACOutputDriver::IndDAC::IndDAC(){ // @suppress("Class members should be properly initialized")
 	curr_freq = 1;
-	curr_freq_Hz = static_cast<uint32_t>((curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ);
 }
 
 
@@ -90,7 +88,8 @@ void DACOutputDriver::IndDAC::setup(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* t
 	freq_update_flag = f;
 
 	wave_queue->dequeue(l_num, lut_point);		// Load the waveform data
-	reinitialize_timer(curr_freq_Hz);			// Set the initial frequency
+
+	reinitialize_timer(curr_freq);			// Set the initial frequency
 	HAL_TIM_Base_Start(tim_handle); 			// Start the timer
 	restart_DAC();
 }
@@ -108,8 +107,7 @@ void DACOutputDriver::IndDAC::update_freq(uint8_t f_num){
 		}
 
 		freq_update_flag->set_flag();
-		curr_freq_Hz = static_cast<uint32_t>((curr_freq / (float)FREQ_KNOB_STEPS) * MAX_FREQ);
-		reinitialize_timer(curr_freq_Hz);
+		reinitialize_timer(curr_freq);
 	}
 }
 
@@ -119,10 +117,16 @@ void DACOutputDriver::IndDAC::restart_DAC(void){
 	HAL_DAC_Start_DMA(dac_handle, dac_channel, lut_point, lut_size, dac_alignment);
 }
 
-void DACOutputDriver::IndDAC::reinitialize_timer(uint32_t frequency){
-    uint32_t tim_period = SYS_CLOCK_FREQ / (lut_size * frequency) - 1;
+void DACOutputDriver::IndDAC::reinitialize_timer(uint8_t freq_idx){
+	curr_freq_Hz = (freq_idx == 1) ? 1 : static_cast<uint32_t>(((float)freq_idx / FREQ_KNOB_STEPS) * MAX_FREQ);
+    uint32_t tim_period = SYS_CLOCK_FREQ / (lut_size * curr_freq_Hz) - 1;
     tim_handle->Instance->ARR = tim_period;
     tim_handle->Init.Period = tim_period;
+}
+
+
+uint8_t DACOutputDriver::IndDAC::get_freq_idx(void){
+	return curr_freq;
 }
 
 

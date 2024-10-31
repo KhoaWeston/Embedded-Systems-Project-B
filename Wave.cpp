@@ -102,40 +102,18 @@ void Wave::shift_follow_wave(void){
 }
 
 
-Wave::IndWave::IndWave(){
+Wave::IndWave::IndWave(){ // @suppress("Class members should be properly initialized")
 	curr_wave = SINE;
 	curr_amp = 1;
-
-	generate_waves();
-	scale_waves();
-	write_output_wave();
 }
 
 
 void Wave::IndWave::write_output_wave(void){
-	for (uint16_t i = 0; i < LUT_SIZE; i++){
-		output_wave_LUT[i] = scaled_wave_tables[curr_wave-1][i];
-	}
-}
-
-
-void Wave::IndWave::generate_waves(void){ // Build all general and scaled waveforms
-	for(uint16_t i = 0; i < LUT_SIZE; i++){
-		base_wave_tables[0][i] = (DAC_VALUE_MAX / 2 - VERT_OFFSET) * (sin(2 * M_PI * i / LUT_SIZE) + 1); 			// Build sine
-		base_wave_tables[1][i] = 2 * (DAC_VALUE_MAX / 2 - VERT_OFFSET) * (float)i / (LUT_SIZE - 1); 				// Build sawtooth
-		base_wave_tables[2][i] = (i < LUT_SIZE / 2) ? 2 * (DAC_VALUE_MAX / 2 - VERT_OFFSET) : 0; 					// Build square
-		base_wave_tables[3][i] = abs((2 * (DAC_VALUE_MAX / 2 - VERT_OFFSET)) * (-(float)i / (LUT_SIZE / 2) + 1)) ; 	// Build triangle
-	}
-}
-
-
-void Wave::IndWave::scale_waves(void){ // Scale all general waves based on amplitude
 	float scale_factor = curr_amp / (float)AMP_KNOB_STEPS;
+	const uint32_t* wave_table = base_wave_tables[curr_wave - 1];
 
-	for(uint16_t i = 0; i < LUT_SIZE; i++){
-		for(uint8_t j = 0; j < 4; j++){
-			scaled_wave_tables[j][i] = base_wave_tables[j][i] * scale_factor + VERT_OFFSET;
-		}
+	for (uint16_t i = 0; i < LUT_SIZE; i++) {
+		output_wave_LUT[i] = wave_table[i] * scale_factor + VERT_OFFSET;
 	}
 }
 
@@ -143,6 +121,8 @@ void Wave::IndWave::scale_waves(void){ // Scale all general waves based on ampli
 void Wave::IndWave::set_pointers(Queue *q, EventFlag* f){
 	queue = q;
 	wave_update_flag = f;
+
+	write_output_wave();
 }
 
 
@@ -167,7 +147,6 @@ void Wave::IndWave::update_wave_params(uint8_t w_num, uint8_t a_num){ // Update 
 		}else if(amp_change == DEC){
 			curr_amp = (curr_amp == 1) ? AMP_KNOB_STEPS : curr_amp-1;
 		}
-		scale_waves();
 		write_output_wave();
 		wave_update_flag->set_flag();
 	}
@@ -189,3 +168,43 @@ WaveType Wave::IndWave::get_wave_type(void) {
     return curr_wave;
 }
 
+
+// Pre-computed lookup tables
+const uint32_t sine_wave_table[LUT_SIZE] = {
+1998, 2096, 2193, 2291, 2387, 2483, 2577, 2671, 2762, 2852, 2939, 3025, 3108, 3188, 3265, 3339, 3410, 3478, 3542, 3602,
+3659, 3711, 3760, 3804, 3843, 3879, 3909, 3936, 3957, 3974, 3986, 3993, 3996, 3993, 3986, 3974, 3957, 3936, 3909, 3879,
+3843, 3804, 3760, 3711, 3659, 3602, 3542, 3478, 3410, 3339, 3265, 3188, 3108, 3025, 2939, 2852, 2762, 2671, 2577, 2483,
+2387, 2291, 2193, 2096, 1998, 1899, 1802, 1704, 1608, 1512, 1418, 1324, 1233, 1143, 1056, 970, 887, 807, 730, 656, 585,
+517, 453, 393, 336, 284, 235, 191, 152, 116, 86, 59, 38, 21, 9, 2, 0, 2, 9, 21, 38, 59, 86, 116, 152, 191, 235, 284, 336,
+393, 453, 517, 585, 656, 730, 807, 887, 970, 1056, 1143, 1233, 1324, 1418, 1512, 1608, 1704, 1802, 1899
+};
+
+const uint32_t saw_wave_table[LUT_SIZE] = {
+0, 31, 62, 94, 125, 157, 188, 220, 251, 283, 314, 346, 377, 409, 440, 471, 503, 534, 566, 597, 629, 660, 692,
+723, 755, 786, 818, 849, 881, 912, 943, 975, 1006, 1038, 1069, 1101, 1132, 1164, 1195, 1227, 1258, 1290, 1321,
+1352, 1384, 1415, 1447, 1478, 1510, 1541, 1573, 1604, 1636, 1667, 1699, 1730, 1762, 1793, 1824, 1856, 1887,
+1919, 1950, 1982, 2013, 2045, 2076, 2108, 2139, 2171, 2202, 2233, 2265, 2296, 2328, 2359, 2391, 2422, 2454,
+2485, 2517, 2548, 2580, 2611, 2643, 2674, 2705, 2737, 2768, 2800, 2831, 2863, 2894, 2926, 2957, 2989, 3020,
+3052, 3083, 3114, 3146, 3177, 3209, 3240, 3272, 3303, 3335, 3366, 3398, 3429, 3461, 3492, 3524, 3555, 3586,
+3618, 3649, 3681, 3712, 3744, 3775, 3807, 3838, 3870, 3901, 3933, 3964, 3996
+};
+
+const uint32_t square_wave_table[LUT_SIZE] = {
+3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+3996, 3996, 3996, 3996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+const uint32_t triangle_wave_table[LUT_SIZE] = {
+3996, 3933, 3871, 3808, 3746, 3683, 3621, 3558, 3496, 3434, 3371, 3309, 3246, 3184, 3121, 3059, 2997, 2934, 2872, 2809, 2747,
+2684, 2622, 2559, 2497, 2435, 2372, 2310, 2247, 2185, 2122, 2060, 1998, 1935, 1873, 1810, 1748, 1685, 1623, 1560, 1498, 1436,
+1373, 1311, 1248, 1186, 1123, 1061, 999, 936, 874, 811, 749, 686, 624, 561, 499, 437, 374, 312, 249, 187, 124, 62, 0, 62, 124,
+187, 249, 312, 374, 437, 499, 561, 624, 686, 749, 811, 874, 936, 999, 1061, 1123, 1186, 1248, 1311, 1373, 1436, 1498, 1560,
+1623, 1685, 1748, 1810, 1873, 1935, 1998, 2060, 2122, 2185, 2247, 2310, 2372, 2435, 2497, 2559, 2622, 2684, 2747, 2809, 2872,
+2934, 2997, 3059, 3121, 3184, 3246, 3309, 3371, 3434, 3496, 3558, 3621, 3683, 3746, 3808, 3871, 3933
+};
+
+// Group tables for ease of access in code
+const uint32_t* base_wave_tables[4] = {sine_wave_table, saw_wave_table, square_wave_table, triangle_wave_table};
