@@ -18,7 +18,7 @@ void Queue::queueConstruct(){
 	}
 }
 
-bool Queue::enqueue(int32_t type, int32_t value){
+bool Queue::enqueue(uint8_t type, uint32_t value){
 	if(tail<Q_SIZE){
 		buffer[tail][type] = value;
 		tail++;
@@ -34,15 +34,17 @@ bool Queue::enqueue(int32_t type, int32_t value){
 	}
 }
 
-bool Queue::dequeue(int32_t type, int32_t& value){
-	if(head>0){
+bool Queue::dequeue(uint8_t type, uint32_t& value){
+	if(head<Q_SIZE){
 		value = buffer[head][type];
-		head--;
+		buffer[head][type]=0;
+		head++;
 		return true;
 	}
-	else if(head ==0){
+	else if(head==Q_SIZE){
 		value = buffer[head][type];
-		head=Q_SIZE;
+		buffer[head][type]=0;
+		head=0;
 		return true;
 	}
 	else{

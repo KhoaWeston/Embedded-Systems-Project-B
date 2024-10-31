@@ -15,12 +15,13 @@
 class Queue{
 public:
 	void queueConstruct();
-	bool enqueue(int32_t type, int32_t value);
-	bool dequeue(int32_t type, int32_t& value);
+	bool enqueue(uint8_t type, uint32_t value);
+	bool dequeue(uint8_t type, uint32_t& value);
 private:
-	int32_t buffer[Q_SIZE][6];
-	int32_t tail=0;
-	int32_t head=0;
+	uint32_t buffer[Q_SIZE][6];
+	uint32_t tail=0;
+	uint32_t head=0;
+	enum inputType{FREQ,AMP,CHANNEL,FOLLOW,DELAY,WAVETYPE};
 };
 
 

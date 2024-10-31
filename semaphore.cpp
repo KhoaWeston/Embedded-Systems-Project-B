@@ -6,5 +6,23 @@
  */
 
 
+#include "semaphore.h"
 
+void semaphore::semaphoreConstruct(){
+	flag = false;
+}
+
+bool semaphore::flagFlip(){
+		if(flag==false){
+			flag=true;
+			return true;
+		}
+		else if(flag==true){
+			flag=false;
+			return true;
+		}
+		else{
+			return false;
+		}
+}
 
