@@ -1,67 +1,50 @@
-/**
+/*
  * This Library is written and optimized by Olivier Van den Eede(4ilo) in 2016
  * for Stm32 Uc and HAL-i2c lib's.
  *
  * To use this library with ssd1306 oled display you will need to customize the defines below.
- *
- * This library uses 2 extra files (fonts.c/h).
- * In these files is 1 font you can use:
- *     - Font_7x10
  */
+
 
 #ifndef _SSD1306_H
 #define _SSD1306_H
 
 #include "main.h"
-#include "fonts.h"
+#include "stm32l4xx_ll_i2c.h"
 
-// I2c address
-#ifndef SSD1306_I2C_ADDR
-#define SSD1306_I2C_ADDR        (0x78)
-#endif // SSD1306_I2C_ADDR
+#define SSD1306_I2C_ADDR        (0x78)	// I2c address
+#define SSD1306_WIDTH           (128)	// SSD1306 width in pixels
+#define SSD1306_HEIGHT          (64)	// SSD1306 LCD height in pixels
+#define FONT_HEIGHT 			(10)
+#define FONT_WIDTH 				(7)
 
-// SSD1306 width in pixels
-#ifndef SSD1306_WIDTH
-#define SSD1306_WIDTH           (128)
-#endif // SSD1306_WIDTH
+// Enumeration for screen colors
+enum SSD1306_COLOR{
+    BLACK,		// Black color, no pixel
+    BLUE,		// Pixel is set. Color depends on LCD
+};
 
-// SSD1306 LCD height in pixels
-#ifndef SSD1306_HEIGHT
-#define SSD1306_HEIGHT          (64)
-#endif // SSD1306_HEIGHT
-
-#ifndef SSD1306_COM_LR_REMAP
-#define SSD1306_COM_LR_REMAP    (0)
-#endif // SSD1306_COM_LR_REMAP
-
-#ifndef SSD1306_COM_ALTERNATIVE_PIN_CONFIG
-#define SSD1306_COM_ALTERNATIVE_PIN_CONFIG    (1)
-#endif // SSD1306_COM_ALTERNATIVE_PIN_CONFIG
+extern const uint16_t Font7x10[];
 
 
-//  Enumeration for screen colors
-typedef enum {
-    Black,		// Black color, no pixel
-    Blue,		// Pixel is set. Color depends on LCD
-} SSD1306_COLOR;
-
-
-//  Struct to store transformations
-typedef struct {
-    uint16_t CurrentX;
+class OledI2CDriver{
+private:
+	uint16_t CurrentX;
     uint16_t CurrentY;
     uint8_t Inverted;
-    uint8_t Initialized;
-} SSD1306_t;
-
-
-//  Function definitions
-uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c);
-void ssd1306_UpdateScreen(I2C_HandleTypeDef *hi2c);
-void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color);
-char ssd1306_WriteChar(char ch);
-char ssd1306_WriteString(const char* str);
-void ssd1306_SetCursor(uint8_t x, uint8_t y);
+    uint8_t SSD1306_Buffer[SSD1306_WIDTH * SSD1306_HEIGHT / 8];
+    void ssd1306_write_command(I2C_HandleTypeDef *, uint8_t );
+    void ssd1306_write_buffer(I2C_HandleTypeDef *, uint8_t , uint8_t* , uint16_t );
+	void ssd1306_draw_pixel(uint8_t, uint8_t, SSD1306_COLOR);
+	char ssd1306_write_char(char);
+public:
+	// Function definitions
+	void ssd1306_init(I2C_HandleTypeDef*);
+	void ssd1306_update_screen(I2C_HandleTypeDef*);
+	char ssd1306_write_string(const char*);
+	void ssd1306_set_cursor(uint8_t, uint8_t);
+};
 
 
 #endif  // _SSD1306_H
+

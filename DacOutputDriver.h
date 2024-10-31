@@ -9,20 +9,19 @@
 #define INC_DACOUTPUTDRIVER_H_
 
 #include "main.h"
-#include "stm32l4xx_ll_tim.h"  // Offers the HAL_LL timer functions
 #include "Queue.h"
 
-#define FREQ_KNOB_STEPS			(8)			// Number of steps for frequency knob
+#define FREQ_KNOB_STEPS			(10)			// Number of steps for frequency knob
 #define SYS_CLOCK_FREQ			(80000000)	// 80 MHz system clock frequency
-#define MAX_FREQ				(10000)		// Max allowed frequency in Hz
+#define MAX_FREQ				(1000)		// Max allowed frequency in Hz
 
 
 class DACOutputDriver{ // @suppress("Miss copy constructor or assignment operator")
 private:
 	class IndDAC{ // @suppress("Miss copy constructor or assignment operator")
 	private:
-		DAC_HandleTypeDef* dac_handle; 		// DAC hadle for the channel
-		TIM_HandleTypeDef* tim_handle; 		// Timer handle fo the channel
+		DAC_HandleTypeDef* dac_handle; 		// DAC handle for the channel
+		TIM_HandleTypeDef* tim_handle; 		// Timer handle for the channel
 		uint32_t dac_channel; 				// DAC channel identifier
 		uint32_t dac_alignment; 			// dAC alignment setting
 
@@ -37,9 +36,10 @@ private:
 	public:
 		IndDAC(void); 						// Constructor initializes channels and enqueues startup values for display
 		void setup(DAC_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint16_t, Queue*, LUTQueue*, EventFlag*, uint8_t);
-		void reinitialize_timer(uint32_t); 	// Updates timer frequency
+		void reinitialize_timer(uint8_t); 	// Updates timer frequency
 		void restart_DAC(void); 			// Restart the DAC DMA output
 		void update_freq(uint8_t); 			// Changes frequency based on instructions from queue
+		uint8_t get_freq_idx(void);			// Returns current frequency index
 		uint32_t get_freq(void); 			// Returns current frequency in Hz
 	}dac_ch1, dac_ch2; 						// Child classes to handle specific DAC channels
 

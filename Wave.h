@@ -10,17 +10,17 @@
 
 #include "main.h"
 #include "Queue.h"
-#include <math.h>
-#include <assert.h>
 
 #define M_PI					(3.14159265)	// Pi value
 #define LUT_SIZE       			(128) 			// Lookup table size (i.e. resolution)
-#define AMP_KNOB_STEPS			(8)				// Number of steps for amplitude knob
+#define AMP_KNOB_STEPS			(10)			// Number of steps for amplitude knob
 #define DELAY_KNOB_STEPS		(8) 			// Number of steps for delay knob
-#define VERT_OFFSET 			(25)			// Bottom and top offset to avoid clipping
+#define VERT_OFFSET 			(50)			// Bottom and top offset to avoid clipping
 #define DAC_VALUE_MAX			(4096)			// Max DAC value
 
 enum WaveType{NO_WAVE, SINE, SAW, SQUARE, TRI}; // Wave type options
+
+extern const uint32_t* base_wave_tables[4];
 
 
 class Wave{ // @suppress("Miss copy constructor or assignment operator")
@@ -32,13 +32,7 @@ private:
 
 		uint8_t curr_amp; 								// Index for current amplitude (1 to AMP_KNOB_STEPS)
 		WaveType curr_wave; 							// Index for current wave type
-
-		uint32_t base_wave_tables[4][LUT_SIZE];			// General wave lookup tables (SINE, SAW, SQUARE, TRI)
-		uint32_t scaled_wave_tables[4][LUT_SIZE];		// Scaled wave lookup tables
 		uint32_t output_wave_LUT[LUT_SIZE];				// Final wave lookup table for DAC output
-
-		void scale_waves(void);							// Scale all general wave tables based on amplitude
-		void generate_waves(void); 						// Initialize all general and scaled wave tables
 	public:
 		IndWave(void);									// Constructor to initialize attributes and wave tables
 		void set_pointers(Queue*, EventFlag*);			// Assigns pointer attributes passed from parent
@@ -46,7 +40,7 @@ private:
 		uint32_t* get_active_wave_LUT(void); 			// Return the current wave LUT
 		uint16_t get_amplitude(void);					// Returns curr_amp in mV
 		WaveType get_wave_type(void);					// Returns curr_wave
-		void write_output_wave(void);							// Write current wave into output LUT
+		void write_output_wave(void);					// Write current wave into output LUT
 	}wave_ch1, wave_ch2; 								// Child classes for individual waves for channel 1 and 2
 
 	Queue *ID_queue; 									// Queue for instructions from InputDriver

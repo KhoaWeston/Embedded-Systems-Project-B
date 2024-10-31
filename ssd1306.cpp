@@ -1,104 +1,85 @@
 #include "ssd1306.h"
 
 
-// Screenbuffer
-static uint8_t SSD1306_Buffer[SSD1306_WIDTH * SSD1306_HEIGHT / 8];
-
-// Screen object
-static SSD1306_t SSD1306;
-
-
-//  Send a byte to the command register
-static uint8_t ssd1306_WriteCommand(I2C_HandleTypeDef *hi2c, uint8_t command){
-    return HAL_I2C_Mem_Write(hi2c, SSD1306_I2C_ADDR, 0x00, 1, &command, 1, 10);
+void OledI2CDriver::ssd1306_write_command(I2C_HandleTypeDef *hi2c, uint8_t command) {
+    ssd1306_write_buffer(hi2c, 0x00, &command, 1);
 }
 
 
-//  Initialize the oled screen
-uint8_t ssd1306_Init(I2C_HandleTypeDef *hi2c){
-    // Wait for the screen to boot
-    HAL_Delay(100);
-    int status = 0;
+void OledI2CDriver::ssd1306_write_buffer(I2C_HandleTypeDef *hi2c, uint8_t mem_addr, uint8_t* buffer, uint16_t size) {
+    // Wait until I2C is ready
+    while (LL_I2C_IsActiveFlag_BUSY(hi2c->Instance));
 
-    // Init LCD
-    status += ssd1306_WriteCommand(hi2c, 0xAE);   // Display off
-    status += ssd1306_WriteCommand(hi2c, 0x20);   // Set Memory Addressing Mode
-    status += ssd1306_WriteCommand(hi2c, 0x10);   // 00,Horizontal Addressing Mode;01,Vertical Addressing Mode;10,Page Addressing Mode (RESET);11,Invalid
-    status += ssd1306_WriteCommand(hi2c, 0xB0);   // Set Page Start Address for Page Addressing Mode,0-7
-    status += ssd1306_WriteCommand(hi2c, 0xC8);   // Set COM Output Scan Direction
-    status += ssd1306_WriteCommand(hi2c, 0x00);   // Set low column address
-    status += ssd1306_WriteCommand(hi2c, 0x10);   // Set high column address
-    status += ssd1306_WriteCommand(hi2c, 0x40);   // Set start line address
-    status += ssd1306_WriteCommand(hi2c, 0x81);   // set contrast control register
-    status += ssd1306_WriteCommand(hi2c, 0xFF);
-    status += ssd1306_WriteCommand(hi2c, 0xA1);   // Set segment re-map 0 to 127
-    status += ssd1306_WriteCommand(hi2c, 0xA6);   // Set normal display
+    // Start I2C transmission to device
+    LL_I2C_HandleTransfer(hi2c->Instance, SSD1306_I2C_ADDR, LL_I2C_ADDRSLAVE_7BIT, size + 1, LL_I2C_MODE_AUTOEND, LL_I2C_GENERATE_START_WRITE);
 
-    status += ssd1306_WriteCommand(hi2c, 0xA8);   // Set multiplex ratio(1 to 64)
-    status += ssd1306_WriteCommand(hi2c, SSD1306_HEIGHT - 1);
+    // Send memory address
+    while (!LL_I2C_IsActiveFlag_TXE(hi2c->Instance));
+    LL_I2C_TransmitData8(hi2c->Instance, mem_addr);
 
-    status += ssd1306_WriteCommand(hi2c, 0xA4);   // 0xa4,Output follows RAM content;0xa5,Output ignores RAM content
-    status += ssd1306_WriteCommand(hi2c, 0xD3);   // Set display offset
-    status += ssd1306_WriteCommand(hi2c, 0x00);   // No offset
-    status += ssd1306_WriteCommand(hi2c, 0xD5);   // Set display clock divide ratio/oscillator frequency
-    status += ssd1306_WriteCommand(hi2c, 0xF0);   // Set divide ratio
-    status += ssd1306_WriteCommand(hi2c, 0xD9);   // Set pre-charge period
-    status += ssd1306_WriteCommand(hi2c, 0x22);
-
-    status += ssd1306_WriteCommand(hi2c, 0xDA);   // Set com pins hardware configuration
-    status += ssd1306_WriteCommand(hi2c, SSD1306_COM_LR_REMAP << 5 | SSD1306_COM_ALTERNATIVE_PIN_CONFIG << 4 | 0x02);
-
-    status += ssd1306_WriteCommand(hi2c, 0xDB);   // Set vcomh
-    status += ssd1306_WriteCommand(hi2c, 0x20);   // 0x20,0.77xVcc
-    status += ssd1306_WriteCommand(hi2c, 0x8D);   // Set DC-DC enable
-    status += ssd1306_WriteCommand(hi2c, 0x14);   //
-    status += ssd1306_WriteCommand(hi2c, 0xAF);   // Turn on SSD1306 panel
-
-    if (status != 0) {
-        return 1;
+    // Send buffer data
+    for (uint16_t i = 0; i < size; i++) {
+        while (!LL_I2C_IsActiveFlag_TXE(hi2c->Instance));
+        LL_I2C_TransmitData8(hi2c->Instance, buffer[i]);
     }
 
-    // Clear screen
+    // Wait for the transfer to complete
+    while (!LL_I2C_IsActiveFlag_STOP(hi2c->Instance));
+
+    // Clear the STOP flag
+    LL_I2C_ClearFlag_STOP(hi2c->Instance);
+}
+
+
+//  Initialize the OLED screen
+void OledI2CDriver::ssd1306_init(I2C_HandleTypeDef *hi2c){
+    // Wait for the screen to boot
+
+    ssd1306_write_command(hi2c, 0xAE);   // Display off
+	ssd1306_write_command(hi2c, 0xC8);   // Set COM Output Scan Direction
+	ssd1306_write_command(hi2c, 0x10);   // Set high column address
+	ssd1306_write_command(hi2c, 0xA1);   // Set segment re-map 0 to 127
+	ssd1306_write_command(hi2c, 0x00);   // No offset
+	ssd1306_write_command(hi2c, 0xDB);   // Set vcomh
+	ssd1306_write_command(hi2c, 0x20);   // 0x20,0.77xVcc
+	ssd1306_write_command(hi2c, 0x8D);   // Set DC-DC enable
+	ssd1306_write_command(hi2c, 0x14);   //
+    ssd1306_write_command(hi2c, 0xAF);   // Turn on SSD1306 panel
+
+    // Clear screen by filling with black color
     for(uint32_t i = 0; i < sizeof(SSD1306_Buffer); i++){
-		SSD1306_Buffer[i] = 0x00;
+		SSD1306_Buffer[i] = 0;
 	}
 
-    // Flush buffer to screen
-    ssd1306_UpdateScreen(hi2c);
+    ssd1306_update_screen(hi2c); // Flush buffer to screen
 
     // Set default values for screen object
-    SSD1306.CurrentX = 0;
-    SSD1306.CurrentY = 0;
-
-    SSD1306.Initialized = 1;
-
-    return 0;
+    CurrentX = 0;
+    CurrentY = 0;
+    Inverted = 0;
 }
 
 
 //  Write the screenbuffer with changed to the screen
-void ssd1306_UpdateScreen(I2C_HandleTypeDef *hi2c){
+void OledI2CDriver::ssd1306_update_screen(I2C_HandleTypeDef *hi2c){
     for (uint8_t i = 0; i < 8; i++) {
-        ssd1306_WriteCommand(hi2c, 0xB0 + i);
-        ssd1306_WriteCommand(hi2c, 0x00);
-        ssd1306_WriteCommand(hi2c, 0x10);
+    	ssd1306_write_command(hi2c, 0xB0 + i);
 
-        HAL_I2C_Mem_Write(hi2c, SSD1306_I2C_ADDR, 0x40, 1, &SSD1306_Buffer[SSD1306_WIDTH * i], SSD1306_WIDTH, 100);
+        ssd1306_write_buffer(hi2c, 0x40, &SSD1306_Buffer[SSD1306_WIDTH * i], SSD1306_WIDTH);
     }
 }
 
 
 //  Draw one pixel in the screenbuffer
-void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color){
+void OledI2CDriver::ssd1306_draw_pixel(uint8_t x, uint8_t y, SSD1306_COLOR color){
     if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT){
-        // Don't write outside the buffer
-        return;
+        return; // Don't write outside the buffer
     }
 
 	uint16_t index = x + (y / 8) * SSD1306_WIDTH;
 	uint8_t bit_mask = 1 << (y % 8);
 
-	if (color != SSD1306.Inverted) {
+	if (color != Inverted) {
 		SSD1306_Buffer[index] |= bit_mask; // Set pixel
 	} else {
 		SSD1306_Buffer[index] &= ~bit_mask; // Clear pixel
@@ -106,60 +87,127 @@ void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color){
 }
 
 
-//
 //  Draw 1 char to the screen buffer
-//  ch      => Character to write
-//
-char ssd1306_WriteChar(char ch)
-{
+char OledI2CDriver::ssd1306_write_char(char ch){
     uint32_t b;
 
     // Check remaining space on current line
-    if (SSD1306_WIDTH <= (SSD1306.CurrentX + FONT_WIDTH) || SSD1306_HEIGHT <= (SSD1306.CurrentY + FONT_HEIGHT)) {
-        // Not enough space on current line
-        return 0;
+    if (SSD1306_WIDTH <= (CurrentX + FONT_WIDTH) || SSD1306_HEIGHT <= (CurrentY + FONT_HEIGHT)) {
+        return 0; // Not enough space on current line
+    }
+
+    uint16_t idx;
+    if(ch == 'k'){
+    	idx = 58 * FONT_HEIGHT;
+    }else if(ch == 'm'){
+    	idx = 59 * FONT_HEIGHT;
+    }else if(ch == 'z'){
+    	idx = 60 * FONT_HEIGHT;
+    }else{
+    	idx = (ch - ' ') * FONT_HEIGHT;
     }
 
     // Translate font to screenbuffer
     for (uint32_t i = 0; i < FONT_HEIGHT; i++){
-        b = Font7x10[(ch - 32) * FONT_HEIGHT + i];
+    	b = Font7x10[idx + i];
+
         for (uint32_t j = 0; j < FONT_WIDTH; j++) {
             if ((b << j) & 0x8000){
-                ssd1306_DrawPixel(SSD1306.CurrentX + j, (SSD1306.CurrentY + i), Blue);
+                ssd1306_draw_pixel(CurrentX + j, (CurrentY + i), BLUE);
             }else{
-                ssd1306_DrawPixel(SSD1306.CurrentX + j, (SSD1306.CurrentY + i), Black);
+                ssd1306_draw_pixel(CurrentX + j, (CurrentY + i), BLACK);
             }
         }
     }
+    CurrentX += FONT_WIDTH; // The current space is now taken
 
-    // The current space is now taken
-    SSD1306.CurrentX += FONT_WIDTH;
-
-    // Return written char for validation
-    return ch;
+    return ch; // Return written char for validation
 }
 
 
 //  Write full string to screenbuffer
-char ssd1306_WriteString(const char* str){
+char OledI2CDriver::ssd1306_write_string(const char* str){
     // Write until null-byte
-    while (*str){
-        if (ssd1306_WriteChar(*str) != *str){
-            // Char could not be written
-            return *str;
+    while (*str){ // TODO: get rid of
+        if (ssd1306_write_char(*str) != *str){
+            return *str; // Char could not be written
         }
-
-        // Next char
-        str++;
+        str++; // Next char
     }
 
-    // Everything ok
-    return *str;
+    return *str; // Everything ok
 }
 
 
 //  Set cursor position
-void ssd1306_SetCursor(uint8_t x, uint8_t y){
-    SSD1306.CurrentX = x;
-    SSD1306.CurrentY = y;
+void OledI2CDriver::ssd1306_set_cursor(uint8_t x, uint8_t y){
+	CurrentX = x;
+	CurrentY = y;
 }
+
+
+// Bitmap for font
+const uint16_t Font7x10 [] = {
+0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,  // sp
+0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x0000, 0x1000, 0x0000, 0x0000,  // !
+0x2800, 0x2800, 0x2800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,  // "
+0x2400, 0x2400, 0x7C00, 0x2400, 0x4800, 0x7C00, 0x4800, 0x4800, 0x0000, 0x0000,  // #
+0x3800, 0x5400, 0x5000, 0x3800, 0x1400, 0x5400, 0x5400, 0x3800, 0x1000, 0x0000,  // $
+0x2000, 0x5400, 0x5800, 0x3000, 0x2800, 0x5400, 0x1400, 0x0800, 0x0000, 0x0000,  // %
+0x1000, 0x2800, 0x2800, 0x1000, 0x3400, 0x4800, 0x4800, 0x3400, 0x0000, 0x0000,  // &
+0x1000, 0x1000, 0x1000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,  // '
+0x0800, 0x1000, 0x2000, 0x2000, 0x2000, 0x2000, 0x2000, 0x2000, 0x1000, 0x0800,  // (
+0x2000, 0x1000, 0x0800, 0x0800, 0x0800, 0x0800, 0x0800, 0x0800, 0x1000, 0x2000,  // )
+0x1000, 0x3800, 0x1000, 0x2800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,  // *
+0x0000, 0x0000, 0x1000, 0x1000, 0x7C00, 0x1000, 0x1000, 0x0000, 0x0000, 0x0000,  // +
+0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x1000, 0x1000, 0x1000,  // ,
+0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x3800, 0x0000, 0x0000, 0x0000, 0x0000,  // -
+0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x1000, 0x0000, 0x0000,  // .
+0x0800, 0x0800, 0x1000, 0x1000, 0x1000, 0x1000, 0x2000, 0x2000, 0x0000, 0x0000,  // /
+0x3800, 0x4400, 0x4400, 0x5400, 0x4400, 0x4400, 0x4400, 0x3800, 0x0000, 0x0000,  // 0
+0x1000, 0x3000, 0x5000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x0000, 0x0000,  // 1
+0x3800, 0x4400, 0x4400, 0x0400, 0x0800, 0x1000, 0x2000, 0x7C00, 0x0000, 0x0000,  // 2
+0x3800, 0x4400, 0x0400, 0x1800, 0x0400, 0x0400, 0x4400, 0x3800, 0x0000, 0x0000,  // 3
+0x0800, 0x1800, 0x2800, 0x2800, 0x4800, 0x7C00, 0x0800, 0x0800, 0x0000, 0x0000,  // 4
+0x7C00, 0x4000, 0x4000, 0x7800, 0x0400, 0x0400, 0x4400, 0x3800, 0x0000, 0x0000,  // 5
+0x3800, 0x4400, 0x4000, 0x7800, 0x4400, 0x4400, 0x4400, 0x3800, 0x0000, 0x0000,  // 6
+0x7C00, 0x0400, 0x0800, 0x1000, 0x1000, 0x2000, 0x2000, 0x2000, 0x0000, 0x0000,  // 7
+0x3800, 0x4400, 0x4400, 0x3800, 0x4400, 0x4400, 0x4400, 0x3800, 0x0000, 0x0000,  // 8
+0x3800, 0x4400, 0x4400, 0x4400, 0x3C00, 0x0400, 0x4400, 0x3800, 0x0000, 0x0000,  // 9
+0x0000, 0x0000, 0x1000, 0x0000, 0x0000, 0x0000, 0x0000, 0x1000, 0x0000, 0x0000,  // :
+0x0000, 0x0000, 0x0000, 0x1000, 0x0000, 0x0000, 0x0000, 0x1000, 0x1000, 0x1000,  // ;
+0x0000, 0x0000, 0x0C00, 0x3000, 0x4000, 0x3000, 0x0C00, 0x0000, 0x0000, 0x0000,  // <
+0x0000, 0x0000, 0x0000, 0x7C00, 0x0000, 0x7C00, 0x0000, 0x0000, 0x0000, 0x0000,  // =
+0x0000, 0x0000, 0x6000, 0x1800, 0x0400, 0x1800, 0x6000, 0x0000, 0x0000, 0x0000,  // >
+0x3800, 0x4400, 0x0400, 0x0800, 0x1000, 0x1000, 0x0000, 0x1000, 0x0000, 0x0000,  // ?
+0x3800, 0x4400, 0x4C00, 0x5400, 0x5C00, 0x4000, 0x4000, 0x3800, 0x0000, 0x0000,  // @
+0x1000, 0x2800, 0x2800, 0x2800, 0x2800, 0x7C00, 0x4400, 0x4400, 0x0000, 0x0000,  // A
+0x7800, 0x4400, 0x4400, 0x7800, 0x4400, 0x4400, 0x4400, 0x7800, 0x0000, 0x0000,  // B
+0x3800, 0x4400, 0x4000, 0x4000, 0x4000, 0x4000, 0x4400, 0x3800, 0x0000, 0x0000,  // C
+0x7000, 0x4800, 0x4400, 0x4400, 0x4400, 0x4400, 0x4800, 0x7000, 0x0000, 0x0000,  // D
+0x7C00, 0x4000, 0x4000, 0x7C00, 0x4000, 0x4000, 0x4000, 0x7C00, 0x0000, 0x0000,  // E
+0x7C00, 0x4000, 0x4000, 0x7800, 0x4000, 0x4000, 0x4000, 0x4000, 0x0000, 0x0000,  // F
+0x3800, 0x4400, 0x4000, 0x4000, 0x5C00, 0x4400, 0x4400, 0x3800, 0x0000, 0x0000,  // G
+0x4400, 0x4400, 0x4400, 0x7C00, 0x4400, 0x4400, 0x4400, 0x4400, 0x0000, 0x0000,  // H
+0x3800, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x3800, 0x0000, 0x0000,  // I
+0x0400, 0x0400, 0x0400, 0x0400, 0x0400, 0x0400, 0x4400, 0x3800, 0x0000, 0x0000,  // J
+0x4400, 0x4800, 0x5000, 0x6000, 0x5000, 0x4800, 0x4800, 0x4400, 0x0000, 0x0000,  // K
+0x4000, 0x4000, 0x4000, 0x4000, 0x4000, 0x4000, 0x4000, 0x7C00, 0x0000, 0x0000,  // L
+0x4400, 0x6C00, 0x6C00, 0x5400, 0x4400, 0x4400, 0x4400, 0x4400, 0x0000, 0x0000,  // M
+0x4400, 0x6400, 0x6400, 0x5400, 0x5400, 0x4C00, 0x4C00, 0x4400, 0x0000, 0x0000,  // N
+0x3800, 0x4400, 0x4400, 0x4400, 0x4400, 0x4400, 0x4400, 0x3800, 0x0000, 0x0000,  // O
+0x7800, 0x4400, 0x4400, 0x4400, 0x7800, 0x4000, 0x4000, 0x4000, 0x0000, 0x0000,  // P
+0x3800, 0x4400, 0x4400, 0x4400, 0x4400, 0x4400, 0x5400, 0x3800, 0x0400, 0x0000,  // Q
+0x7800, 0x4400, 0x4400, 0x4400, 0x7800, 0x4800, 0x4800, 0x4400, 0x0000, 0x0000,  // R
+0x3800, 0x4400, 0x4000, 0x3000, 0x0800, 0x0400, 0x4400, 0x3800, 0x0000, 0x0000,  // S
+0x7C00, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x0000, 0x0000,  // T
+0x4400, 0x4400, 0x4400, 0x4400, 0x4400, 0x4400, 0x4400, 0x3800, 0x0000, 0x0000,  // U
+0x4400, 0x4400, 0x4400, 0x2800, 0x2800, 0x2800, 0x1000, 0x1000, 0x0000, 0x0000,  // V
+0x4400, 0x4400, 0x5400, 0x5400, 0x5400, 0x6C00, 0x2800, 0x2800, 0x0000, 0x0000,  // W
+0x4400, 0x2800, 0x2800, 0x1000, 0x1000, 0x2800, 0x2800, 0x4400, 0x0000, 0x0000,  // X
+0x4400, 0x4400, 0x2800, 0x2800, 0x1000, 0x1000, 0x1000, 0x1000, 0x0000, 0x0000,  // Y
+0x4000, 0x4000, 0x4800, 0x5000, 0x6000, 0x5000, 0x4800, 0x4400, 0x0000, 0x0000,  // k
+0x0000, 0x0000, 0x7800, 0x5400, 0x5400, 0x5400, 0x5400, 0x5400, 0x0000, 0x0000,  // m
+0x0000, 0x0000, 0x7C00, 0x0800, 0x1000, 0x2000, 0x4000, 0x7C00, 0x0000, 0x0000,  // z
+};
+
