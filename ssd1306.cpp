@@ -1,98 +1,100 @@
 #include "ssd1306.h"
 
 
-void OledI2CDriver::ssd1306_write_command(I2C_HandleTypeDef *hi2c, uint8_t command) {
-    ssd1306_write_buffer(hi2c, 0x00, &command, 1);
+void OledI2cDriver::write_command(uint8_t command) {
+    write_buffer(0x00, &command, 1);
 }
 
 
-void OledI2CDriver::ssd1306_write_buffer(I2C_HandleTypeDef *hi2c, uint8_t mem_addr, uint8_t* buffer, uint16_t size) {
+void OledI2cDriver::write_buffer(uint8_t mem_addr, uint8_t* buff, uint16_t size) {
     // Wait until I2C is ready
-    while (LL_I2C_IsActiveFlag_BUSY(hi2c->Instance));
+    while (LL_I2C_IsActiveFlag_BUSY(i2c_handle->Instance));
 
     // Start I2C transmission to device
-    LL_I2C_HandleTransfer(hi2c->Instance, SSD1306_I2C_ADDR, LL_I2C_ADDRSLAVE_7BIT, size + 1, LL_I2C_MODE_AUTOEND, LL_I2C_GENERATE_START_WRITE);
+    LL_I2C_HandleTransfer(i2c_handle->Instance, I2C_ADDR, LL_I2C_ADDRSLAVE_7BIT, size + 1, LL_I2C_MODE_AUTOEND, LL_I2C_GENERATE_START_WRITE);
 
     // Send memory address
-    while (!LL_I2C_IsActiveFlag_TXE(hi2c->Instance));
-    LL_I2C_TransmitData8(hi2c->Instance, mem_addr);
+    while (!LL_I2C_IsActiveFlag_TXE(i2c_handle->Instance));
+    LL_I2C_TransmitData8(i2c_handle->Instance, mem_addr);
 
     // Send buffer data
     for (uint16_t i = 0; i < size; i++) {
-        while (!LL_I2C_IsActiveFlag_TXE(hi2c->Instance));
-        LL_I2C_TransmitData8(hi2c->Instance, buffer[i]);
+        while (!LL_I2C_IsActiveFlag_TXE(i2c_handle->Instance));
+        LL_I2C_TransmitData8(i2c_handle->Instance, buff[i]);
     }
 
     // Wait for the transfer to complete
-    while (!LL_I2C_IsActiveFlag_STOP(hi2c->Instance));
+    while (!LL_I2C_IsActiveFlag_STOP(i2c_handle->Instance));
 
     // Clear the STOP flag
-    LL_I2C_ClearFlag_STOP(hi2c->Instance);
+    LL_I2C_ClearFlag_STOP(i2c_handle->Instance);
+}
+
+
+OledI2cDriver::OledI2cDriver(void){
+	// Clear screen by filling with black color
+	for(uint32_t i = 0; i < sizeof(buffer); i++){
+		buffer[i] = 0;
+	}
+
+	// Set default values for screen object
+	currentX = 0;
+	currentY = 0;
 }
 
 
 //  Initialize the OLED screen
-void OledI2CDriver::ssd1306_init(I2C_HandleTypeDef *hi2c){
-    // Wait for the screen to boot
+void OledI2cDriver::I2C_init(I2C_HandleTypeDef *hi2c){
+	i2c_handle = hi2c;
 
-    ssd1306_write_command(hi2c, 0xAE);   // Display off
-	ssd1306_write_command(hi2c, 0xC8);   // Set COM Output Scan Direction
-	ssd1306_write_command(hi2c, 0x10);   // Set high column address
-	ssd1306_write_command(hi2c, 0xA1);   // Set segment re-map 0 to 127
-	ssd1306_write_command(hi2c, 0x00);   // No offset
-	ssd1306_write_command(hi2c, 0xDB);   // Set vcomh
-	ssd1306_write_command(hi2c, 0x20);   // 0x20,0.77xVcc
-	ssd1306_write_command(hi2c, 0x8D);   // Set DC-DC enable
-	ssd1306_write_command(hi2c, 0x14);   //
-    ssd1306_write_command(hi2c, 0xAF);   // Turn on SSD1306 panel
+    write_command(0xAE);   // Display off
+	write_command(0xC8);   // Set COM Output Scan Direction
+	write_command(0x10);   // Set high column address
+	write_command(0xA1);   // Set segment re-map 0 to 127
+	write_command(0x00);   // No offset
+	write_command(0xDB);   // Set vcomh
+	write_command(0x20);   // 0x20,0.77xVcc
+	write_command(0x8D);   // Set DC-DC enable
+	write_command(0x14);   //
+    write_command(0xAF);   // Turn on SSD1306 panel
 
-    // Clear screen by filling with black color
-    for(uint32_t i = 0; i < sizeof(SSD1306_Buffer); i++){
-		SSD1306_Buffer[i] = 0;
-	}
-
-    ssd1306_update_screen(hi2c); // Flush buffer to screen
-
-    // Set default values for screen object
-    CurrentX = 0;
-    CurrentY = 0;
-    Inverted = 0;
+    update_screen(); // Flush buffer to screen
 }
 
 
 //  Write the screenbuffer with changed to the screen
-void OledI2CDriver::ssd1306_update_screen(I2C_HandleTypeDef *hi2c){
+void OledI2cDriver::update_screen(void){
     for (uint8_t i = 0; i < 8; i++) {
-    	ssd1306_write_command(hi2c, 0xB0 + i);
+    	write_command(0xB0 + i);
 
-        ssd1306_write_buffer(hi2c, 0x40, &SSD1306_Buffer[SSD1306_WIDTH * i], SSD1306_WIDTH);
+        write_buffer(0x40, &buffer[OLED_WIDTH * i], OLED_WIDTH);
     }
 }
 
 
 //  Draw one pixel in the screenbuffer
-void OledI2CDriver::ssd1306_draw_pixel(uint8_t x, uint8_t y, SSD1306_COLOR color){
-    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT){
+void OledI2cDriver::draw_pixel(uint8_t x, uint8_t y, OledColors color){
+    if (x >= OLED_WIDTH || y >= OLED_HEIGHT){
         return; // Don't write outside the buffer
     }
 
-	uint16_t index = x + (y / 8) * SSD1306_WIDTH;
+	uint16_t index = x + (y / 8) * OLED_WIDTH;
 	uint8_t bit_mask = 1 << (y % 8);
 
-	if (color != Inverted) {
-		SSD1306_Buffer[index] |= bit_mask; // Set pixel
+	if (color != 0) {
+		buffer[index] |= bit_mask; // Set pixel
 	} else {
-		SSD1306_Buffer[index] &= ~bit_mask; // Clear pixel
+		buffer[index] &= ~bit_mask; // Clear pixel
 	}
 }
 
 
 //  Draw 1 char to the screen buffer
-char OledI2CDriver::ssd1306_write_char(char ch){
+char OledI2cDriver::write_char(char ch){
     uint32_t b;
 
     // Check remaining space on current line
-    if (SSD1306_WIDTH <= (CurrentX + FONT_WIDTH) || SSD1306_HEIGHT <= (CurrentY + FONT_HEIGHT)) {
+    if (OLED_WIDTH <= (currentX + FONT_WIDTH) || OLED_HEIGHT <= (currentY + FONT_HEIGHT)) {
         return 0; // Not enough space on current line
     }
 
@@ -113,23 +115,23 @@ char OledI2CDriver::ssd1306_write_char(char ch){
 
         for (uint32_t j = 0; j < FONT_WIDTH; j++) {
             if ((b << j) & 0x8000){
-                ssd1306_draw_pixel(CurrentX + j, (CurrentY + i), BLUE);
+                draw_pixel(currentX + j, (currentY + i), BLUE);
             }else{
-                ssd1306_draw_pixel(CurrentX + j, (CurrentY + i), BLACK);
+                draw_pixel(currentX + j, (currentY + i), BLACK);
             }
         }
     }
-    CurrentX += FONT_WIDTH; // The current space is now taken
+    currentX += FONT_WIDTH; // The current space is now taken
 
     return ch; // Return written char for validation
 }
 
 
 //  Write full string to screenbuffer
-char OledI2CDriver::ssd1306_write_string(const char* str){
+char OledI2cDriver::write_string(const char* str){
     // Write until null-byte
     while (*str){ // TODO: get rid of
-        if (ssd1306_write_char(*str) != *str){
+        if (write_char(*str) != *str){
             return *str; // Char could not be written
         }
         str++; // Next char
@@ -140,9 +142,9 @@ char OledI2CDriver::ssd1306_write_string(const char* str){
 
 
 //  Set cursor position
-void OledI2CDriver::ssd1306_set_cursor(uint8_t x, uint8_t y){
-	CurrentX = x;
-	CurrentY = y;
+void OledI2cDriver::set_cursor(uint8_t x, uint8_t y){
+	currentX = x;
+	currentY = y;
 }
 
 

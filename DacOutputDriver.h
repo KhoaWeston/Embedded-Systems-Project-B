@@ -11,9 +11,8 @@
 #include "main.h"
 #include "Queue.h"
 
-#define FREQ_KNOB_STEPS			(10)			// Number of steps for frequency knob
 #define SYS_CLOCK_FREQ			(80000000)	// 80 MHz system clock frequency
-#define MAX_FREQ				(1000)		// Max allowed frequency in Hz
+#define TIM_PRESCALER 			(10)
 
 
 class DACOutputDriver{ // @suppress("Miss copy constructor or assignment operator")
@@ -25,32 +24,25 @@ private:
 		uint32_t dac_channel; 				// DAC channel identifier
 		uint32_t dac_alignment; 			// dAC alignment setting
 
-		uint8_t curr_freq; 					// Current frequency index (1 to FREQFREQ_KNOB_STEPS)
 		uint32_t curr_freq_Hz;				// Actual frequency in Hz
 		uint16_t lut_size;					// Size oft he lookup table
 		uint32_t* lut_point;				// Pointer to the LUT data
 
-		Queue* queue;						// Queue for receiving frequency change instructions
-		LUTQueue *wave_queue;				// Queue for receiving wave data
+		Queue* wave_queue;					// Queue for receiving frequency change instructions
+		LUTQueue *lut_wave_queue;			// Queue for receiving wave data
 		EventFlag* freq_update_flag;		// Flag for channel synchronization
 	public:
-		IndDAC(void); 						// Constructor initializes channels and enqueues startup values for display
-		void setup(DAC_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint16_t, Queue*, LUTQueue*, EventFlag*, uint8_t);
-		void reinitialize_timer(uint8_t); 	// Updates timer frequency
+		void initialize(DAC_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint16_t, Queue*, LUTQueue*, EventFlag*, uint8_t, uint8_t);
+		void reinitialize_timer(void); 		// Updates timer frequency
 		void restart_DAC(void); 			// Restart the DAC DMA output
 		void update_freq(uint8_t); 			// Changes frequency based on instructions from queue
-		uint8_t get_freq_idx(void);			// Returns current frequency index
-		uint32_t get_freq(void); 			// Returns current frequency in Hz
 	}dac_ch1, dac_ch2; 						// Child classes to handle specific DAC channels
 
-	Queue* ID_queue;						// Queue for receiving frequency instructions
-	Queue *dis_queue;						// Queue for sending change updates to the display
-	LUTQueue *wave_queue;					// Queue for LUT changes
+	Queue* wave_queue;						// Queue for receiving frequency instructions
+	LUTQueue *lut_wave_queue;				// Queue for LUT changes
 	EventFlag freq1_update_flag, freq2_update_flag;		// Flag for frequency updates
-
-	bool follow_mode_active; 				// Indicates whether channel 2 echos channel 1
 public:
-	DACOutputDriver(DAC_HandleTypeDef*, TIM_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint32_t, Queue*, LUTQueue*, Queue*, uint16_t);
+	DACOutputDriver(DAC_HandleTypeDef*, TIM_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint32_t, Queue*, LUTQueue*, uint16_t);
 	void update_DAC(void);					// Main function to update DAC channels
 };
 

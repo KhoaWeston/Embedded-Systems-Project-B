@@ -8,12 +8,11 @@
 #include <DisplayOutputDriver.h>
 
 
-DisplayOutputDriver::DisplayOutputDriver(I2C_HandleTypeDef* i2c, Queue* q, Queue* q2, Queue* q3){
+DisplayOutputDriver::DisplayOutputDriver(I2C_HandleTypeDef* i2c, Queue* q, Queue* q2){
 	i2c_handle = i2c;
 
 	ID_queue = q;
 	wave_queue = q2;
-	DAC_queue = q3;
 
 	curr_channel = 1;
 	selected_mode = 1;
@@ -31,16 +30,16 @@ void DisplayOutputDriver::initialize_display(void){
 	wave_queue->dequeue(AMP2_1, amp2);
 	wave_queue->dequeue(TYPE1_1, wave_type1);
 	wave_queue->dequeue(TYPE2_1, wave_type2);
-	DAC_queue->dequeue(FREQ1_1, freq1);
-	DAC_queue->dequeue(FREQ2_1, freq2);
+	wave_queue->dequeue(FREQ1_2, freq1);
+	wave_queue->dequeue(FREQ2_2, freq2);
 
-	OLED.ssd1306_init(i2c_handle); // Initialize the OLED
+	I2C_init(i2c_handle); // Initialize the OLED
 	display_wave_type();
 	display_channel();
 	display_delay();
 	display_freq();
 	display_amp();
-	OLED.ssd1306_update_screen(i2c_handle); // Push updates to screen
+	update_screen(); // Push updates to screen
 }
 
 
@@ -50,7 +49,8 @@ void DisplayOutputDriver::update_display(){
 	bool needs_screen_update = false;
 
 	// Check for frequency/amplitude selection changes
-	if(ID_queue->dequeue(F_OR_A, selected_mode)){
+	bool selection_updated = ID_queue->dequeue(F_OR_A, selected_mode);
+	if(selection_updated){
 		display_freq();
 		display_amp(); // update if amp, cursor, or channel
 
@@ -58,8 +58,10 @@ void DisplayOutputDriver::update_display(){
 	}
 
 	// Check for channel selection changes
-	if(ID_queue->dequeue(CHAN, curr_channel)){
-		if(ID_queue->dequeue(FOLLOW_2, fol_change)){
+	bool channel_updated = ID_queue->dequeue(CHAN, curr_channel);
+	if(channel_updated){
+		bool follow_mode_updated = ID_queue->dequeue(FOLLOW_1, fol_change);
+		if(follow_mode_updated){
 			follow_mode = (fol_change == MODE_ON);
 		}
 
@@ -73,51 +75,69 @@ void DisplayOutputDriver::update_display(){
 	}
 
 	// Check for updates in amplitude, waveform type, frequency, or delay
-	if(wave_queue->dequeue(AMP1_1, amp1) || wave_queue->dequeue(AMP2_1, amp2)){
+	bool amp1_updated = wave_queue->dequeue(AMP1_1, amp1);
+	bool amp2_updated = wave_queue->dequeue(AMP2_1, amp2);
+	if(amp1_updated || amp2_updated){
 		display_amp();
 		needs_screen_update = true;
 	}
-	if(wave_queue->dequeue(TYPE1_1, wave_type1) || wave_queue->dequeue(TYPE2_1, wave_type2)){
+
+	bool type1_updated = wave_queue->dequeue(TYPE1_1, wave_type1);
+	bool type2_updated = wave_queue->dequeue(TYPE2_1, wave_type2);
+	if(type1_updated || type2_updated){
 		display_wave_type();
 		needs_screen_update = true;
 	}
-	if(DAC_queue->dequeue(FREQ1_1, freq1) || DAC_queue->dequeue(FREQ2_1, freq2)){
+
+	bool freq1_updated = wave_queue->dequeue(FREQ1_2, freq1);
+	bool freq2_updated = wave_queue->dequeue(FREQ2_2, freq2);
+	if(freq1_updated || freq2_updated){
 		display_freq();
 		needs_screen_update = true;
 	}
-	if(wave_queue->dequeue(DEL_1, delay)){
+
+	bool delay_updated = wave_queue->dequeue(DEL_1, delay);
+	if(delay_updated){
 		display_delay();
 		needs_screen_update = true;
 	}
 
 	// Refresh screen if any changes were made
 	if(needs_screen_update){
-		OLED.ssd1306_update_screen(i2c_handle);
+		update_screen();
 	}
 }
 
 
 // Display the selected channel
 void DisplayOutputDriver::display_channel(){
-	OLED.ssd1306_set_cursor(90, 0);
-	OLED.ssd1306_write_string(("CH:"+std::to_string(curr_channel)).c_str());
+	ASSERT(curr_channel == 1 || curr_channel == 2);
+
+	set_cursor(90, 0);
+	write_string(("CH:"+std::to_string(curr_channel)).c_str());
 }
 
 
 // Display the current waveform type
 void DisplayOutputDriver::display_wave_type(){
-	static std::string wave_types[] = {"ERROR ", "SINE  ", "SAW   ", "SQUARE", "TRI   "};
-	std::string wave_str = (curr_channel == 1) ? wave_types[wave_type1] : wave_types[wave_type2];
+	uint8_t curr_wave_type = (curr_channel == 1) ? wave_type1-1 : wave_type2-1;
+	ASSERT(0 <= curr_wave_type && curr_wave_type <= 2);
 
-	OLED.ssd1306_set_cursor(0, 0);
-	OLED.ssd1306_write_string(("WAVE:"+wave_str).c_str());
+	static std::string wave_types[] = {"SINE  ", "SQUARE", "PULSE "}; // {"SINE  ", "SAW   ", "SQUARE", "TRI   ", "PULSE "}
+	std::string wave_str = wave_types[curr_wave_type];
+
+	set_cursor(0, 0);
+	write_string(("WAVE:"+wave_str).c_str());
 }
 
 
 // Display current frequency with one decimal place
 void DisplayOutputDriver::display_freq(){
+	uint32_t curr_freq = (curr_channel == 1) ? freq1 : freq2;
+	ASSERT(0 < curr_freq && curr_freq <= 62500);
+
 	std::string sel_arrow = (selected_mode == 1) ? ">" : "";
-	std::string f_str = (curr_channel == 1) ? std::to_string(freq1) : std::to_string(freq2);
+	std::string f_str = std::to_string(curr_freq);
 
 	std::string f_str_dis;
 	if(f_str.size()<4){
@@ -128,15 +148,18 @@ void DisplayOutputDriver::display_freq(){
 		f_str_dis = thousandths + "." + hundredths + "kHz ";
 	}
 
-	OLED.ssd1306_set_cursor(0, 20);
-	OLED.ssd1306_write_string((sel_arrow + "FREQ: " + f_str_dis).c_str());
+	set_cursor(0, 20);
+	write_string((sel_arrow + "FREQ: " + f_str_dis).c_str());
 }
 
 
 // Display current amplitude with one decimal place
 void DisplayOutputDriver::display_amp(){
+	uint16_t curr_amp = (curr_channel == 1) ? amp1 : amp2;
+	ASSERT(0 < curr_amp && curr_amp <= 3300);
+
 	std::string sel_arrow = (selected_mode == 2) ? ">" : "";
-	std::string a_str = (curr_channel == 1) ? std::to_string(amp1) : std::to_string(amp2);
+	std::string a_str = std::to_string(curr_amp);
 
 	std::string a_str_dis;
 	if(a_str.size()<4){
@@ -147,19 +170,27 @@ void DisplayOutputDriver::display_amp(){
 		a_str_dis = thousandths + "." + hundredths + "V  ";
 	}
 
-	OLED.ssd1306_set_cursor(0, 35);
-	OLED.ssd1306_write_string((sel_arrow + "AMP: " + a_str_dis).c_str());
+	set_cursor(0, 35);
+	write_string((sel_arrow + "AMP: " + a_str_dis).c_str());
 }
 
 
 // Display the delay percentage for CH2 when follower mode is active
 void DisplayOutputDriver::display_delay(){
-	OLED.ssd1306_set_cursor(0, 50);
+	ASSERT(0 < delay && delay <= 100);
+
+	set_cursor(0, 50);
 	if(curr_channel == 2){
-		std::string del_str = (follow_mode) ? std::to_string(delay)+"% " : "NA  ";
-		OLED.ssd1306_write_string(("DELAY: "+del_str).c_str());
+		std::string del_str;
+		if(!follow_mode){
+			del_str = "NA  ";
+		}else{
+			del_str = (delay == 100) ? "0% " : std::to_string(delay)+"% ";
+		}
+
+		write_string(("DELAY: "+del_str).c_str());
 	}else{
-		OLED.ssd1306_write_string("                ");
+		write_string("                "); // Write nothing
 	}
 }
 
