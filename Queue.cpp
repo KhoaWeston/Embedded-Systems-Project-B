@@ -40,19 +40,25 @@ bool Queue::enqueue(uint8_t type, uint32_t value){
 }
 
 bool Queue::dequeue(uint8_t type, uint32_t& value){
-	if(head<Q_SIZE){
-		value = buffer[head][type];
-		buffer[head][type]=0;
-		head++;
-		return true;
-	}
-	else if(head==Q_SIZE){
-		value = buffer[head][type];
-		buffer[head][type]=0;
-		head=0;
-		return true;
+	if(buffer[head][type]!=0){
+		if(head<Q_SIZE){
+			value = buffer[head][type];
+			buffer[head][type]=0;
+			head++;
+			return true;
+		}
+		else if(head==Q_SIZE){
+			value = buffer[head][type];
+			buffer[head][type]=0;
+			head=0;
+			return true;
+		}
+		else{
+			return false;
+		}
 	}
 	else{
 		return false;
 	}
+
 }
