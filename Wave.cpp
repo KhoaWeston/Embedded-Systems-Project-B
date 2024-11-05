@@ -83,7 +83,7 @@ void Wave::update_waves(void){
 		}
 		shift_follow_wave();
 
-		uint16_t delay_in_percent = static_cast<uint16_t>((delay / (float)DELAY_KNOB_STEPS) * 100);
+		uint16_t delay_in_percent = (delay * 100) / DELAY_KNOB_STEPS;
 		(void)dis_queue->enqueue(DEL_1, delay_in_percent);
 	}
 
@@ -149,7 +149,7 @@ void Wave::update_waves(void){
 void Wave::shift_follow_wave(void){
 	uint32_t* base_LUT = wave_ch1.get_active_wave_LUT();
 	uint32_t* shifted_LUT = wave_ch2.get_active_wave_LUT();
-	uint16_t shift_idx = (delay / (float)DELAY_KNOB_STEPS) * LUT_SIZE;
+	uint16_t shift_idx = (delay * LUT_SIZE) / DELAY_KNOB_STEPS;
 
 	if (shift_idx == 0) { // If shift_idx is zero, copy directly
 		for (uint16_t i = 0; i < LUT_SIZE; i++) {
@@ -161,7 +161,7 @@ void Wave::shift_follow_wave(void){
 		for (uint16_t i = 0; i < LUT_SIZE; i++) {
 			new_index = i + shift_idx;
 			if (new_index >= LUT_SIZE) {
-				new_index -= LUT_SIZE; // Manually wrap around
+				new_index -= LUT_SIZE;
 			}
 			shifted_LUT[i] = base_LUT[new_index];
 		}
@@ -179,11 +179,10 @@ Wave::IndWave::IndWave(){ // @suppress("Class members should be properly initial
 
 
 void Wave::IndWave::write_output_wave(void){
-	float scale_factor = curr_amp / (float)AMP_KNOB_STEPS;
 	const uint32_t* wave_table = base_wave_tables[curr_wave - 1];
 
 	for (uint16_t i = 0; i < LUT_SIZE; i++) {
-		output_wave_LUT[i] = wave_table[i] * scale_factor + VERT_OFFSET;
+		output_wave_LUT[i] = ((wave_table[i] * curr_amp) / AMP_KNOB_STEPS) + VERT_OFFSET;
 	}
 }
 
@@ -244,7 +243,7 @@ uint32_t* Wave::IndWave::get_active_wave_LUT(void){ // Return the current wave l
 
 uint16_t Wave::IndWave::get_amplitude(void) {
 	const uint16_t max_dac_out = 3300; // in mV
-	return static_cast<uint16_t>((curr_amp / (float)AMP_KNOB_STEPS) * max_dac_out);
+	return (curr_amp * max_dac_out) / AMP_KNOB_STEPS;
 }
 
 
@@ -254,7 +253,7 @@ WaveType Wave::IndWave::get_wave_type(void) {
 
 
 uint32_t Wave::IndWave::get_freq_Hz(void){
-	return (curr_freq == 1) ? 1 : static_cast<uint32_t>(((float)curr_freq / FREQ_KNOB_STEPS) * MAX_FREQ);
+	return (curr_freq == 1) ? 1 : (curr_freq * MAX_FREQ) / FREQ_KNOB_STEPS;
 }
 
 

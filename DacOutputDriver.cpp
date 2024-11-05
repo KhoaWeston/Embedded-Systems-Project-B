@@ -15,7 +15,10 @@ DACOutputDriver::DACOutputDriver(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim1
 	ASSERT(tim2 != nullptr);
 	ASSERT(w_q != nullptr);
 	ASSERT(lut_q != nullptr);
-	// TODO: ASSERT remaining parameters
+	ASSERT(chan1 == DAC_CHANNEL_1);
+	ASSERT(chan2 == DAC_CHANNEL_2);
+	ASSERT(align == DAC_ALIGN_12B_R);
+	ASSERT(sizeof(size) == 2);
 
 	wave_queue = w_q;
 	lut_wave_queue = lut_q;
@@ -38,7 +41,7 @@ void DACOutputDriver::update_DAC(void){
 		freq2_update_flag.reset_flag();
 
 		// Only sync if frequencies are same
-		if(dac_ch1.get_freq() == dac_ch1.get_freq()){
+		if(dac_ch1.get_freq() == dac_ch2.get_freq()){
 			dac_ch1.restart_DAC();
 			dac_ch2.restart_DAC();
 		}
@@ -99,6 +102,7 @@ void DACOutputDriver::IndDAC::reinitialize_timer(void){
 	tim_handle->Instance->ARR = tim_period;
 	tim_handle->Init.Period = tim_period;
 }
+
 
 uint32_t DACOutputDriver::IndDAC::get_freq(void){
 	return curr_freq_Hz;

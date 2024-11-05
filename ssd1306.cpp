@@ -8,6 +8,7 @@ void OledI2cDriver::write_command(uint8_t command) {
 }
 
 
+// ChatGPT aided
 void OledI2cDriver::write_buffer(uint8_t mem_addr, uint8_t* buff, uint16_t size) {
 	ASSERT(mem_addr >= 0x00 && mem_addr <= 0xFF);
 	ASSERT(buff != nullptr);

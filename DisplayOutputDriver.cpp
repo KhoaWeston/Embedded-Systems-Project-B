@@ -183,19 +183,19 @@ void DisplayOutputDriver::display_amp(void){
 void DisplayOutputDriver::display_delay(void){
 	ASSERT(0 < delay && delay <= 100);
 
-	set_cursor(0, 48);
+	std::string del_str;
 	if(curr_channel == 2){
-		std::string del_str;
 		if(!follow_mode){
-			del_str = "NA  ";
+			del_str = "OFF ";
 		}else{
 			del_str = (delay == 100) ? "0% " : std::to_string(delay)+"% ";
 		}
-
-		write_string(("DELAY: "+del_str).c_str());
 	}else{
-		write_string("                "); // Write nothing
+		del_str = "NA  ";
 	}
+
+	set_cursor(0, 48);
+	write_string(("DELAY: "+del_str).c_str());
 	update_screen(48/PAGE_SIZE);
 }
 
