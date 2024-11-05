@@ -17,6 +17,8 @@
 #include <iostream>
 #define Q_SIZE 10
 
+enum inputType{FREQ,AMP,CHANNEL,FOLLOW,DELAY,WAVETYPE};
+
 class Queue{
 public:
 	/**
@@ -47,7 +49,6 @@ private:
 	uint32_t buffer[Q_SIZE][6];
 	uint32_t tail=0;
 	uint32_t head=0;
-	enum inputType{FREQ,AMP,CHANNEL,FOLLOW,DELAY,WAVETYPE};
 };
 
 
