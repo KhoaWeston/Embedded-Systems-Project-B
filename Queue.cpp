@@ -19,15 +19,20 @@ void Queue::queueConstruct(){
 }
 
 bool Queue::enqueue(uint8_t type, uint32_t value){
-	if(tail<Q_SIZE){
-		buffer[tail][type] = value;
-		tail++;
-		return true;
-	}
-	else if(tail==Q_SIZE){
-		buffer[tail][type]=value;
-		tail=0;
-		return true;
+	if(buffer[tail][type]==0){
+		if(tail<Q_SIZE){
+			buffer[tail][type] = value;
+			tail++;
+			return true;
+		}
+		else if(tail==Q_SIZE){
+			buffer[tail][type]=value;
+			tail=0;
+			return true;
+		}
+		else{
+			return false;
+		}
 	}
 	else{
 		return false;
