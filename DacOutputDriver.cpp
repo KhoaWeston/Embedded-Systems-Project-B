@@ -9,13 +9,20 @@
 
 
 DACOutputDriver::DACOutputDriver(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim1, TIM_HandleTypeDef* tim2, // @suppress("Class members should be properly initialized")
-		uint32_t chan1, uint32_t chan2, uint32_t align, Queue* q1, LUTQueue* q2, uint16_t s){
-	wave_queue = q1;
-	lut_wave_queue = q2;
+		uint32_t chan1, uint32_t chan2, uint32_t align, Queue* w_q, LUTQueue* lut_q, uint16_t size){
+	ASSERT(dac != nullptr);
+	ASSERT(tim1 != nullptr);
+	ASSERT(tim2 != nullptr);
+	ASSERT(w_q != nullptr);
+	ASSERT(lut_q != nullptr);
+	// TODO: ASSERT remaining parameters
+
+	wave_queue = w_q;
+	lut_wave_queue = lut_q;
 
 	// Initialize DAC channels with setup parameters
-	dac_ch1.initialize(dac, tim1, chan1, align, s, q1, q2, &freq1_update_flag, LUT1, FREQ1_1);
-	dac_ch2.initialize(dac, tim2, chan2, align, s, q1, q2, &freq2_update_flag, LUT2, FREQ2_1);
+	dac_ch1.initialize(dac, tim1, chan1, align, size, w_q, lut_q, &freq1_update_flag, LUT1, FREQ1_1);
+	dac_ch2.initialize(dac, tim2, chan2, align, size, w_q, lut_q, &freq2_update_flag, LUT2, FREQ2_1);
 }
 
 
@@ -39,17 +46,18 @@ void DACOutputDriver::update_DAC(void){
 }
 
 
-void DACOutputDriver::IndDAC::initialize(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim, uint32_t chan, uint32_t align, uint16_t s, Queue* q1, LUTQueue* q2, EventFlag* f, uint8_t l_num, uint8_t f_num){
+void DACOutputDriver::IndDAC::initialize(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim, uint32_t chan,
+		uint32_t align, uint16_t size, Queue* w_q, LUTQueue* lut_q, EventFlag* flag, uint8_t l_num, uint8_t f_num){
 	dac_handle = dac;
 	tim_handle = tim;
 	dac_channel = chan;
 	dac_alignment = align;
 
-	lut_size = s;
+	lut_size = size;
 
-	wave_queue = q1;
-	lut_wave_queue = q2;
-	freq_update_flag = f;
+	wave_queue = w_q;
+	lut_wave_queue = lut_q;
+	freq_update_flag = flag;
 
 	(void)lut_wave_queue->dequeue(l_num, lut_point);	// Load the waveform data
 	ASSERT(lut_point != nullptr);

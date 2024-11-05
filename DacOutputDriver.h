@@ -15,8 +15,20 @@
 #define TIM_PRESCALER 			(4)
 
 
+/**
+ * @brief Manages dual-channel DAC output.
+ *
+ * This class interfaces with the DAC and Timer peripherals to output
+ * specific waveforms based on lookup tables and frequency instructions from queues.
+ */
 class DACOutputDriver{ // @suppress("Miss copy constructor or assignment operator")
 private:
+	/**
+	 * @brief Handles individual DAC channel output.
+	 *
+	 * This nested class manages the DAC channel's timer frequency, DMA output, and updates
+	 * based on queue instructions for specific channel parameters.
+	 */
 	class IndDAC{ // @suppress("Miss copy constructor or assignment operator")
 	private:
 		DAC_HandleTypeDef* dac_handle; 		// DAC handle for the channel
@@ -32,19 +44,76 @@ private:
 		LUTQueue *lut_wave_queue;			// Queue for receiving wave data
 		EventFlag* freq_update_flag;		// Flag for channel synchronization
 	public:
-		void initialize(DAC_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint16_t, Queue*, LUTQueue*, EventFlag*, uint8_t, uint8_t);
-		void reinitialize_timer(void); 		// Updates timer frequency
-		void restart_DAC(void); 			// Restart the DAC DMA output
-		void update_freq(uint8_t); 			// Changes frequency based on instructions from queue
+		/**
+		 * @brief Initializes the DAC channel with provided settings and queues.
+		 * @param x dac Pointer to the DAC handle for the channel.
+		 * @param x tim Pointer to the timer handle for the channel.
+		 * @param x chan DAC channel identifier.
+		 * @param x align DAC alignment setting.
+		 * @param x size Size of the lookup table.
+		 * @param x w_q Pointer to the queue for frequency instructions.
+		 * @param x lut_q Pointer to the queue for LUT data.
+		 * @param x flag Pointer to the event flag for frequency updates.
+		 * @param x l_num Index to dequeue correct LUT pointer.
+		 * @param x f_num Index to dequeue correct frequency value.
+		 */
+		void initialize(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim, uint32_t chan, uint32_t align,
+				uint16_t size, Queue* w_q, LUTQueue* lut_q, EventFlag* flag, uint8_t l_num, uint8_t f_num);
+
+		/**
+		 * @brief Reinitializes the timer to update the DAC output frequency.
+		 *
+		 * Adjusts the timer frequency based on the latest frequency setting.
+		 */
+		void reinitialize_timer(void);
+
+		/**
+		 * @brief Restarts the DAC channel with updated waveform settings.
+		 *
+		 * Ensures that the DAC DMA outputs are in sync.
+		 */
+		void restart_DAC(void);
+
+		/**
+		 * @brief Updates the frequency of the DAC output based on the latest instructions.
+		 * @param x f_num Index to dequeue frequency from correct position.
+		 */
+		void update_freq(uint8_t f_num);
+
+		/**
+		 * @brief Retrieves the current frequency of the DAC output.
+		 * @return Current frequency in Hz.
+		 */
 		uint32_t get_freq(void);
-	}dac_ch1, dac_ch2; 						// Child classes to handle specific DAC channels
+	};
+
+	IndDAC dac_ch1;							// Child classes to handle specific DAC channels
+	IndDAC dac_ch2;
 
 	Queue* wave_queue;						// Queue for receiving frequency instructions
 	LUTQueue *lut_wave_queue;				// Queue for LUT changes
-	EventFlag freq1_update_flag, freq2_update_flag;		// Flag for frequency updates
+	EventFlag freq1_update_flag; 			// Flag for frequency updates
+	EventFlag freq2_update_flag;
 public:
-	DACOutputDriver(DAC_HandleTypeDef*, TIM_HandleTypeDef*, TIM_HandleTypeDef*, uint32_t, uint32_t, uint32_t, Queue*, LUTQueue*, uint16_t);
-	void update_DAC(void);					// Main function to update DAC channels
+	/**
+	 * @brief Constructs a DACOutputDriver object.
+	 * @param x dac Pointer to the DAC handle for both channels.
+	 * @param x tim1_handle Pointer to the timer handle for channel 1.
+	 * @param x tim2_handle Pointer to the timer handle for channel 2.
+	 * @param x chan1 DAC channel identifier for channel 1.
+	 * @param x chan2 DAC channel identifier for channel 2.
+	 * @param x align DAC alignment setting.
+	 * @param x w_q Pointer to the queue for frequency instructions.
+	 * @param x lut_q Pointer to the queue for lookup table (LUT) changes.
+	 * @param x size Size of the lookup table used for waveform generation.
+	 */
+	DACOutputDriver(DAC_HandleTypeDef* dac, TIM_HandleTypeDef* tim1, TIM_HandleTypeDef* tim2,
+			uint32_t chan1, uint32_t chan2, uint32_t align, Queue* w_q, LUTQueue* lut_q, uint16_t size);
+
+	/**
+	 * @brief Updates both DAC channels based on the latest instructions and waveform data.
+	 */
+	void update_DAC(void);
 };
 
 
