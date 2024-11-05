@@ -23,6 +23,9 @@ bool Queue::enqueue(uint8_t type, uint32_t value){
 		if(tail<Q_SIZE){
 			buffer[tail][type] = value;
 			tail++;
+			if(tail==Q_SIZE){
+				tail=0;
+			}
 			return true;
 		}
 		else if(tail==Q_SIZE){
