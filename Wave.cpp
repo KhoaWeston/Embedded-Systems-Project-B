@@ -8,11 +8,16 @@
 #include "Wave.h"
 
 
-Wave::Wave(Queue* q1, Queue* q2, LUTQueue* q3, Queue* q4){ // @suppress("Class members should be properly initialized")
-	ID_queue = q1;
-	DAC_queue = q2;
-	LUT_DAC_queue = q3;
-	dis_queue = q4;
+Wave::Wave(Queue* id_q, Queue* dac_q, LUTQueue* lut_q, Queue* dis_q){ // @suppress("Class members should be properly initialized")
+	ASSERT(id_q != nullptr);
+	ASSERT(dac_q != nullptr);
+	ASSERT(lut_q != nullptr);
+	ASSERT(dis_q != nullptr);
+
+	ID_queue = id_q;
+	DAC_queue = dac_q;
+	LUT_DAC_queue = lut_q;
+	dis_queue = dis_q;
 
 	is_in_follow_mode = false;
 	delay = DELAY_KNOB_STEPS;
@@ -26,25 +31,19 @@ void Wave::initialize_parent(void){
 	wave_ch1.initialize(ID_queue, &wave1_update_flag, &freq1_update_flag);
 	wave_ch2.initialize(ID_queue, &wave2_update_flag, &freq2_update_flag);
 
-	bool status = true;
-
 	// Initialize DAC with initial waveforms and parameters
-	status &= LUT_DAC_queue->enqueue(LUT1, (uint32_t*)wave_ch1.get_active_wave_LUT());
-	status &= LUT_DAC_queue->enqueue(LUT2, (uint32_t*)wave_ch2.get_active_wave_LUT());
-	status &= DAC_queue->enqueue(FREQ1_1, wave_ch1.get_freq_Hz());
-	status &= DAC_queue->enqueue(FREQ2_1, wave_ch2.get_freq_Hz());
+	(void)LUT_DAC_queue->enqueue(LUT1, (uint32_t*)wave_ch1.get_active_wave_LUT());
+	(void)LUT_DAC_queue->enqueue(LUT2, (uint32_t*)wave_ch2.get_active_wave_LUT());
+	(void)DAC_queue->enqueue(FREQ1_1, wave_ch1.get_freq_Hz());
+	(void)DAC_queue->enqueue(FREQ2_1, wave_ch2.get_freq_Hz());
 
 	// Initialize display with starting parameters
-	status &= dis_queue->enqueue(AMP1_1, wave_ch1.get_amplitude());
-	status &= dis_queue->enqueue(AMP2_1, wave_ch2.get_amplitude());
-	status &= dis_queue->enqueue(TYPE1_1, wave_ch1.get_wave_type());
-	status &= dis_queue->enqueue(TYPE2_1, wave_ch2.get_wave_type());
-	status &= dis_queue->enqueue(FREQ1_2, wave_ch1.get_freq_Hz());
-	status &= dis_queue->enqueue(FREQ2_2, wave_ch2.get_freq_Hz());
-
-	if(!status){
-		NVIC_SystemReset();
-	}
+	(void)dis_queue->enqueue(AMP1_1, wave_ch1.get_amplitude());
+	(void)dis_queue->enqueue(AMP2_1, wave_ch2.get_amplitude());
+	(void)dis_queue->enqueue(TYPE1_1, wave_ch1.get_wave_type());
+	(void)dis_queue->enqueue(TYPE2_1, wave_ch2.get_wave_type());
+	(void)dis_queue->enqueue(FREQ1_2, wave_ch1.get_freq_Hz());
+	(void)dis_queue->enqueue(FREQ2_2, wave_ch2.get_freq_Hz());
 }
 
 
@@ -53,9 +52,8 @@ void Wave::update_waves(void){
 	wave_ch1.update_wave_params(TYPE1_0, AMP1_0, FREQ1_0);
 	wave_ch2.update_wave_params(TYPE2_0, AMP2_0, FREQ2_0);
 
-	uint32_t follow_mode_change, delay_change;
-
 	// Toggle follow mode
+	uint32_t follow_mode_change;
 	bool follow_mode_updated = ID_queue->dequeue(FOLLOW_0, follow_mode_change);
 	if(follow_mode_updated){
 		ASSERT(follow_mode_change == MODE_ON || follow_mode_change == MODE_OFF);
@@ -73,6 +71,7 @@ void Wave::update_waves(void){
 	}
 
 	// Adjust delay of wave 2 while in follow mode
+	uint32_t delay_change;
 	bool delay_updated = ID_queue->dequeue(DEL_0, delay_change);
 	if(delay_updated){
 		ASSERT(delay_change == INC || delay_change == DEC);
@@ -85,7 +84,7 @@ void Wave::update_waves(void){
 		shift_follow_wave();
 
 		uint16_t delay_in_percent = static_cast<uint16_t>((delay / (float)DELAY_KNOB_STEPS) * 100);
-		dis_queue->enqueue(DEL_1, delay_in_percent);
+		(void)dis_queue->enqueue(DEL_1, delay_in_percent);
 	}
 
 	// Update display if wave settings have changed
@@ -98,18 +97,17 @@ void Wave::update_waves(void){
 			shift_follow_wave();
 		}
 
-		dis_queue->enqueue(AMP1_1, wave_ch1.get_amplitude());
-		dis_queue->enqueue(TYPE1_1, wave_ch1.get_wave_type());
+		(void)dis_queue->enqueue(AMP1_1, wave_ch1.get_amplitude());
+		(void)dis_queue->enqueue(TYPE1_1, wave_ch1.get_wave_type());
 	}
 	if(wave2_update_flag.is_flag_set()){
 		wave2_update_flag.reset_flag();
-//		bool amp_sent, type_sent;
 		if(is_in_follow_mode){
-			dis_queue->enqueue(AMP2_1, wave_ch1.get_amplitude());
-			dis_queue->enqueue(TYPE2_1, wave_ch1.get_wave_type());
+			(void)dis_queue->enqueue(AMP2_1, wave_ch1.get_amplitude());
+			(void)dis_queue->enqueue(TYPE2_1, wave_ch1.get_wave_type());
 		}else{
-			dis_queue->enqueue(AMP2_1, wave_ch2.get_amplitude());
-			dis_queue->enqueue(TYPE2_1, wave_ch2.get_wave_type());
+			(void)dis_queue->enqueue(AMP2_1, wave_ch2.get_amplitude());
+			(void)dis_queue->enqueue(TYPE2_1, wave_ch2.get_wave_type());
 		}
 	}
 
@@ -125,8 +123,8 @@ void Wave::update_waves(void){
 		uint32_t wave1_freq = wave_ch1.get_freq_Hz();
 		ASSERT(0 < wave1_freq && wave1_freq <= MAX_FREQ);
 
-		DAC_queue->enqueue(FREQ1_1, wave1_freq);
-		dis_queue->enqueue(FREQ1_2, wave1_freq);
+		(void)DAC_queue->enqueue(FREQ1_1, wave1_freq);
+		(void)dis_queue->enqueue(FREQ1_2, wave1_freq);
 	}
 	if(freq2_update_flag.is_flag_set()){
 		freq2_update_flag.reset_flag();
@@ -135,14 +133,14 @@ void Wave::update_waves(void){
 			uint32_t wave1_freq = wave_ch1.get_freq_Hz();
 			ASSERT(0 < wave1_freq && wave1_freq <= MAX_FREQ);
 
-			DAC_queue->enqueue(FREQ2_1, wave1_freq);
-			dis_queue->enqueue(FREQ2_2, wave1_freq);
+			(void)DAC_queue->enqueue(FREQ2_1, wave1_freq);
+			(void)dis_queue->enqueue(FREQ2_2, wave1_freq);
 		}else{
 			uint32_t wave2_freq = wave_ch2.get_freq_Hz();
 			ASSERT(0 < wave2_freq && wave2_freq <= MAX_FREQ);
 
-			DAC_queue->enqueue(FREQ2_1, wave2_freq);
-			dis_queue->enqueue(FREQ2_2, wave2_freq);
+			(void)DAC_queue->enqueue(FREQ2_1, wave2_freq);
+			(void)dis_queue->enqueue(FREQ2_2, wave2_freq);
 		}
 	}
 }
@@ -158,7 +156,7 @@ void Wave::shift_follow_wave(void){
 			shifted_LUT[i] = base_LUT[i];
 		}
 	}else{
-		// Handle the wraparound manually
+		// Handle the wrap-around manually
 		uint16_t new_index;
 		for (uint16_t i = 0; i < LUT_SIZE; i++) {
 			new_index = i + shift_idx;
@@ -190,10 +188,10 @@ void Wave::IndWave::write_output_wave(void){
 }
 
 
-void Wave::IndWave::initialize(Queue *q, EventFlag* w, EventFlag* f){
-	ID_queue = q;
-	wave_update_flag = w;
-	freq_update_flag = f;
+void Wave::IndWave::initialize(Queue *id_q, EventFlag* w_flag, EventFlag* f_flag){
+	ID_queue = id_q;
+	wave_update_flag = w_flag;
+	freq_update_flag = f_flag;
 }
 
 
@@ -246,58 +244,58 @@ uint32_t* Wave::IndWave::get_active_wave_LUT(void){ // Return the current wave l
 
 uint16_t Wave::IndWave::get_amplitude(void) {
 	const uint16_t max_dac_out = 3300; // in mV
-    return static_cast<uint16_t>((curr_amp / (float)AMP_KNOB_STEPS) * max_dac_out);
+	return static_cast<uint16_t>((curr_amp / (float)AMP_KNOB_STEPS) * max_dac_out);
 }
 
 
 WaveType Wave::IndWave::get_wave_type(void) {
-    return curr_wave;
+	return curr_wave;
 }
 
 
 uint32_t Wave::IndWave::get_freq_Hz(void){
-    return (curr_freq == 1) ? 1 : static_cast<uint32_t>(((float)curr_freq / FREQ_KNOB_STEPS) * MAX_FREQ);
+	return (curr_freq == 1) ? 1 : static_cast<uint32_t>(((float)curr_freq / FREQ_KNOB_STEPS) * MAX_FREQ);
 }
 
 
 // Pre-computed lookup tables
 const uint32_t sine_wave_table[LUT_SIZE] = {
-1998, 2047, 2096, 2144, 2193, 2242, 2291, 2339, 2387, 2435, 2483, 2530, 2577, 2624, 2671, 2717, 2762, 2807, 2852, 2896,
-2939, 2982, 3025, 3066, 3108, 3148, 3188, 3227, 3265, 3303, 3339, 3375, 3410, 3445, 3478, 3510, 3542, 3573, 3602, 3631,
-3659, 3686, 3711, 3736, 3760, 3782, 3804, 3824, 3843, 3862, 3879, 3895, 3909, 3923, 3936, 3947, 3957, 3966, 3974, 3980,
-3986, 3990, 3993, 3995, 3996, 3995, 3993, 3990, 3986, 3980, 3974, 3966, 3957, 3947, 3936, 3923, 3909, 3895, 3879, 3862,
-3843, 3824, 3804, 3782, 3760, 3736, 3711, 3686, 3659, 3631, 3602, 3573, 3542, 3510, 3478, 3445, 3410, 3375, 3339, 3303,
-3265, 3227, 3188, 3148, 3108, 3066, 3025, 2982, 2939, 2896, 2852, 2807, 2762, 2717, 2671, 2624, 2577, 2530, 2483, 2435,
-2387, 2339, 2291, 2242, 2193, 2144, 2096, 2047, 1998, 1948, 1899, 1851, 1802, 1753, 1704, 1656, 1608, 1560, 1512, 1465,
-1418, 1371, 1324, 1278, 1233, 1188, 1143, 1099, 1056, 1013, 970, 929, 887, 847, 807, 768, 730, 692, 656, 620, 585, 550,
-517, 485, 453, 422, 393, 364, 336, 309, 284, 259, 235, 213, 191, 171, 152, 133, 116, 100, 86, 72, 59, 48, 38, 29, 21, 15,
-9, 5, 2, 0, 0, 0, 2, 5, 9, 15, 21, 29, 38, 48, 59, 72, 86, 100, 116, 133, 152, 171, 191, 213, 235, 259, 284, 309, 336, 364,
-393, 422, 453, 485, 517, 550, 585, 620, 656, 692, 730, 768, 807, 847, 887, 929, 970, 1013, 1056, 1099, 1143, 1188, 1233,
-1278, 1324, 1371, 1418, 1465, 1512, 1560, 1608, 1656, 1704, 1753, 1802, 1851, 1899, 1948
+		1998, 2047, 2096, 2144, 2193, 2242, 2291, 2339, 2387, 2435, 2483, 2530, 2577, 2624, 2671, 2717, 2762, 2807, 2852, 2896,
+		2939, 2982, 3025, 3066, 3108, 3148, 3188, 3227, 3265, 3303, 3339, 3375, 3410, 3445, 3478, 3510, 3542, 3573, 3602, 3631,
+		3659, 3686, 3711, 3736, 3760, 3782, 3804, 3824, 3843, 3862, 3879, 3895, 3909, 3923, 3936, 3947, 3957, 3966, 3974, 3980,
+		3986, 3990, 3993, 3995, 3996, 3995, 3993, 3990, 3986, 3980, 3974, 3966, 3957, 3947, 3936, 3923, 3909, 3895, 3879, 3862,
+		3843, 3824, 3804, 3782, 3760, 3736, 3711, 3686, 3659, 3631, 3602, 3573, 3542, 3510, 3478, 3445, 3410, 3375, 3339, 3303,
+		3265, 3227, 3188, 3148, 3108, 3066, 3025, 2982, 2939, 2896, 2852, 2807, 2762, 2717, 2671, 2624, 2577, 2530, 2483, 2435,
+		2387, 2339, 2291, 2242, 2193, 2144, 2096, 2047, 1998, 1948, 1899, 1851, 1802, 1753, 1704, 1656, 1608, 1560, 1512, 1465,
+		1418, 1371, 1324, 1278, 1233, 1188, 1143, 1099, 1056, 1013, 970, 929, 887, 847, 807, 768, 730, 692, 656, 620, 585, 550,
+		517, 485, 453, 422, 393, 364, 336, 309, 284, 259, 235, 213, 191, 171, 152, 133, 116, 100, 86, 72, 59, 48, 38, 29, 21, 15,
+		9, 5, 2, 0, 0, 0, 2, 5, 9, 15, 21, 29, 38, 48, 59, 72, 86, 100, 116, 133, 152, 171, 191, 213, 235, 259, 284, 309, 336, 364,
+		393, 422, 453, 485, 517, 550, 585, 620, 656, 692, 730, 768, 807, 847, 887, 929, 970, 1013, 1056, 1099, 1143, 1188, 1233,
+		1278, 1324, 1371, 1418, 1465, 1512, 1560, 1608, 1656, 1704, 1753, 1802, 1851, 1899, 1948
 };
 
 
 const uint32_t square_wave_table[LUT_SIZE] = {
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
 
 const uint32_t pulse_wave_table[LUT_SIZE] = {
-3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
-3996, 3996, 3996, 3996, 3996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996, 3996,
+		3996, 3996, 3996, 3996, 3996, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
 
