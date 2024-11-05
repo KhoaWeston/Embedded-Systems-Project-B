@@ -11,74 +11,105 @@
 #define BTN_DEPRESSED GPIO_PIN_SET //GPIO_PIN_SET = 1
 
 
-
 InputDriver::InputDriver(void){
 	btnLastState=BTN_DEPRESSED;
-	knob_toggle = AMP;
+	knob_toggle = A;
 	chan_toggle = C1;
 	follow_toggle = OFF;
-	tim_cnt = 0;
-	last_cnt = 0;
+	tim_cnt1 = 0;
+	last_cnt1 = 0;
+	tim_cnt2 = 0;
+	last_cnt2 = 0;
+	msg = NA;
+	type = FREQ;
 }
 
 //////////Update the Driver, Send Data to Queues//////////
-InputDriver::update(Button AmpFreq, Button Shape, Button Channel, Button Tshift, TIM_HandleTypeDef *htim1, TIM_HandleTypeDef *htim2){
+
+void InputDriver::update(Button AmpFreq ,Button Shape, Button Channel, Button Follow, TIM_HandleTypeDef *htim1, TIM_HandleTypeDef *htim2){
 	if (btnStateMachine(AmpFreq) == true){
 		//toggle the amp/freq knob
-		if (knob_toggle == AMP){
-			knob_toggle = FREQ;
+		if (knob_toggle == A){
+			knob_toggle = F;
+			GPIOA->ODR ^= 1<<11;//toggle debug
+			//Display_q->enqueue(FREQ,knob_toggle);//enqueue FREQ to display
 		}
-		else if (knob_toggle == FREQ){
-			knob_toggle = AMP;
+		else if (knob_toggle == F){
+			knob_toggle = A;
+			GPIOA->ODR ^= 1<<11;//toggle debug
+			//Display_q->enqueue(AMP,knob_toggle);//enqueue AMP to display
 		}
 	}
 	if (btnStateMachine(Shape) == true){
-		//enqueue to change the wave shape
-		//wavemsg[WAVE] = INC;
-		//WaveQueue->enqueue(wavemsg); //enqueue to inc wave shape
+		msg = INC;
+		//Wave_q->enqueue(WAVETYPE,msg);//enqueue to inc wave shape
 	}
 	if (btnStateMachine(Channel) == true){
 		//toggle between channels
 		if (chan_toggle == C1){
 			chan_toggle = C2;
+			//Display_q->enqueue(CHANNEL, chan_toggle);
+			//enqueue C2 to display
 		}
 		else if (chan_toggle == C2){
 			chan_toggle = C1;
+			//Display_q->enqueue(CHANNEL, chan_toggle);
+			//enqueue C1 to display
 		}
 	}
-	if (btnStateMachine(Tshift) == true){
+	if (btnStateMachine(Follow) == true){
 		//toggle follow mode
 		if (follow_toggle == OFF){
 			follow_toggle = ON;
+			//Wave_q->enqueue(FOLLOW, follow_toggle);//enqueue follow ON to WAVE
+			//Display_q->enqueue(FOLLOW, follow_toggle);//enqueue follow ON to display
 		}
 		else if (follow_toggle == ON){
 			follow_toggle = OFF;
+			//Wave_q->enqueue(FOLLOW, follow_toggle);//enqueue follow OFF to WAVE
+			//Display_q->enqueue(FOLLOW, follow_toggle);//enqueue follow OFF to display
+
 		}
 	}
-	if (knobStateMachine(htim1) == INC){
-		if (knob_toggle == AMP){
-			//wavemsg[AMP] = INC;
-			//WaveQueue->enqueue(wavemsg);//enqueue to inc amplitude
+	//update the amp/frequency knob
+	if (knob1StateMachine(htim1) == INC){
+		if (knob_toggle == A){
+			msg = INC;
+			//Wave_q->enqueue(AMP,msg);//enqueue inc amplitude to WAVE
 		}
-		else if (knob_toggle == FREQ){
-			//wavemsg[FREQ] = INC;
-			//WaveQueue->enqueue(wavemsg);//enqueue to inc frequency
+		else if (knob_toggle == F){
+			msg = INC;
+			//Wave_q->enqueue(FREQ,msg);//enqueue inc frequency to WAVE
 		}
 	}
-	else if (knobStateMachine(htim2) == DEC){
-		if (knob_toggle == AMP){
-			//wavemsg[AMP] = DEC;
-			//WaveQueue->enqueue(wavemsg);//enqueue to dec amplitude
+	else if (knob1StateMachine(htim1) == DEC){
+		if (knob_toggle == A){
+			msg = DEC;
+			//Wave_q->enqueue(AMP,msg);//enqueue dec amplitude to WAVE
 			}
-		else if (knob_toggle == FREQ){
-			//wavemsg[FREQ] = DEC;
-			//WaveQueue->enqueue(wavemsg);//enqueue to dec frequency
+		else if (knob_toggle == F){
+			msg = DEC;
+			//Wave_q->enqueue(FREQ,msg);//enqueue dec frequency to WAVE
 		}
 	}
+	//update the time shift knob, only if follow==on
+	if (follow_toggle == ON){
+		if (knob2StateMachine(htim2) == INC){
+			msg = INC;
+			//Wave_q->enqueue(DELAY,msg);
+			//enqueue INC time shift to WAVE
+		}
+		else if (knob2StateMachine(htim2) == DEC){
+			msg = DEC;
+			//Wave_q->enqueue(DELAY,msg);
+			//enqueue DEC time shift to WAVE
+		}
+	}
+
 }
 
 //////////State machine for Buttons//////////
-InputDriver::btnStateMachine(Button btn){
+bool InputDriver::btnStateMachine(Button btn){
 	static int state = 0;
 	switch(state){
 	case 0:
@@ -92,7 +123,6 @@ InputDriver::btnStateMachine(Button btn){
 			state=0;
 			return false;
 		}
-		break;
 	case 1:
 		//button pressed down, check for bounce
 		if (btn.state()==btnLastState){//button was in fact pressed down
@@ -100,12 +130,11 @@ InputDriver::btnStateMachine(Button btn){
 			state=2;
 			return true;
 		}
-		else{ //button was not pressed down
+		else{ //bounce detected
 			btnLastState=btn.state();
 			state=0;
 			return false;
 		}
-		break;
 	case 2:
 		//button is pressed down, waiting for release
 		if (btn.state()==1 && btn.state()!=btnLastState){//button was released, check for bounce
@@ -113,28 +142,44 @@ InputDriver::btnStateMachine(Button btn){
 			state=0;
 			return false;
 		}
-		else{ // button was not released
+		else{ // still being pressed
 			btnLastState=btn.state();
 			state=1;
 			return false;
 		}
 	default:
 			return false;
-		break;
 	}
 }
 
 //////////State Machine for Buttons//////////
-InputDriver::knobStateMachine(TIM_HandleTypeDef *htim){
+Moves InputDriver::knob1StateMachine(TIM_HandleTypeDef *htim){
 
-	tim_cnt = __HAL_TIM_GET_COUNTER(htim);
+	tim_cnt1 = __HAL_TIM_GET_COUNTER(htim);
 
-	if (tim_cnt > last_cnt){
-		last_cnt = tim_cnt;
+	if (tim_cnt1 > last_cnt1){
+		last_cnt1 = tim_cnt1;
 		return INC;
 	}
-	else if (tim_cnt< last_cnt){
-		last_cnt = tim_cnt;
+	else if (tim_cnt1< last_cnt1){
+		last_cnt1 = tim_cnt1;
+		return DEC;
+	}
+	else{
+		return NA;
+	}
+}
+
+Moves InputDriver::knob2StateMachine(TIM_HandleTypeDef *htim){
+
+	tim_cnt2 = __HAL_TIM_GET_COUNTER(htim);
+
+	if (tim_cnt2 > last_cnt2){
+		last_cnt2 = tim_cnt2;
+		return INC;
+	}
+	else if (tim_cnt2< last_cnt2){
+		last_cnt2 = tim_cnt2;
 		return DEC;
 	}
 	else{
