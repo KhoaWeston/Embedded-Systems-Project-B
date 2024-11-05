@@ -48,6 +48,9 @@ bool Queue::dequeue(uint8_t type, uint32_t& value){
 			value = buffer[head][type];
 			buffer[head][type]=0;
 			head++;
+			if(head==Q_SIZE){
+				head=0;
+			}
 			return true;
 		}
 		else if(head==Q_SIZE){
