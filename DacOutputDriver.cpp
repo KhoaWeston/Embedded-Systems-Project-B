@@ -27,8 +27,14 @@ void DACOutputDriver::update_DAC(void){
 
 	// Synchronize waves if either channel's frequency changes
 	if(freq1_update_flag.is_flag_set() || freq2_update_flag.is_flag_set()){
-		dac_ch1.restart_DAC();
-		dac_ch2.restart_DAC();
+		freq1_update_flag.reset_flag();
+		freq2_update_flag.reset_flag();
+
+		// Only sync if frequencies are same
+		if(dac_ch1.get_freq() == dac_ch1.get_freq()){
+			dac_ch1.restart_DAC();
+			dac_ch2.restart_DAC();
+		}
 	}
 }
 
@@ -45,11 +51,16 @@ void DACOutputDriver::IndDAC::initialize(DAC_HandleTypeDef* dac, TIM_HandleTypeD
 	lut_wave_queue = q2;
 	freq_update_flag = f;
 
-	lut_wave_queue->dequeue(l_num, lut_point);	// Load the waveform data
-	wave_queue->dequeue(f_num, curr_freq_Hz);
+	(void)lut_wave_queue->dequeue(l_num, lut_point);	// Load the waveform data
+	ASSERT(lut_point != nullptr);
+	(void)wave_queue->dequeue(f_num, curr_freq_Hz);
+	ASSERT(curr_freq_Hz > 0);
 
-	reinitialize_timer();			// Set the initial frequency
-	HAL_TIM_Base_Start(tim_handle); 		// Start the timer
+	reinitialize_timer();				// Set the initial frequency
+	HAL_StatusTypeDef status = HAL_TIM_Base_Start(tim_handle); 	// Start the timer
+	if(status != HAL_OK){
+		NVIC_SystemReset();
+	}
 	restart_DAC();
 }
 
@@ -58,8 +69,7 @@ void DACOutputDriver::IndDAC::update_freq(uint8_t f_num){
 	// Adjust the timer frequency
 	bool freq_updated = wave_queue->dequeue(f_num, curr_freq_Hz);
 	if(freq_updated){
-		uint32_t tim_freq_max = SYS_CLOCK_FREQ/(TIM_PRESCALER*lut_size);
-		ASSERT(0 < curr_freq_Hz && curr_freq_Hz <= tim_freq_max);
+		ASSERT(curr_freq_Hz > 0);
 
 		freq_update_flag->set_flag();
 		reinitialize_timer();
@@ -68,13 +78,21 @@ void DACOutputDriver::IndDAC::update_freq(uint8_t f_num){
 
 
 void DACOutputDriver::IndDAC::restart_DAC(void){
-	HAL_DAC_Stop_DMA(dac_handle, dac_channel);
-	HAL_DAC_Start_DMA(dac_handle, dac_channel, lut_point, lut_size, dac_alignment);
+	(void)HAL_DAC_Stop_DMA(dac_handle, dac_channel);
+	HAL_StatusTypeDef status = HAL_DAC_Start_DMA(dac_handle, dac_channel, lut_point, lut_size, dac_alignment);
+	if(status != HAL_OK){
+		NVIC_SystemReset();
+	}
 }
 
+
 void DACOutputDriver::IndDAC::reinitialize_timer(void){
-	uint32_t tim_period = SYS_CLOCK_FREQ / (lut_size * curr_freq_Hz * TIM_PRESCALER) - 1;
+	uint32_t tim_period = SYS_CLOCK_FREQ / (lut_size * curr_freq_Hz * (TIM_PRESCALER + 1)) - 1;
 	tim_handle->Instance->ARR = tim_period;
 	tim_handle->Init.Period = tim_period;
+}
+
+uint32_t DACOutputDriver::IndDAC::get_freq(void){
+	return curr_freq_Hz;
 }
 

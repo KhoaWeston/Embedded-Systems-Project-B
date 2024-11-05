@@ -12,7 +12,7 @@
 #include "Queue.h"
 
 #define SYS_CLOCK_FREQ			(80000000)	// 80 MHz system clock frequency
-#define TIM_PRESCALER 			(10)
+#define TIM_PRESCALER 			(4)
 
 
 class DACOutputDriver{ // @suppress("Miss copy constructor or assignment operator")
@@ -36,6 +36,7 @@ private:
 		void reinitialize_timer(void); 		// Updates timer frequency
 		void restart_DAC(void); 			// Restart the DAC DMA output
 		void update_freq(uint8_t); 			// Changes frequency based on instructions from queue
+		uint32_t get_freq(void);
 	}dac_ch1, dac_ch2; 						// Child classes to handle specific DAC channels
 
 	Queue* wave_queue;						// Queue for receiving frequency instructions

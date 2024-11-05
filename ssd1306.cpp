@@ -31,7 +31,7 @@ void OledI2cDriver::write_buffer(uint8_t mem_addr, uint8_t* buff, uint16_t size)
 }
 
 
-OledI2cDriver::OledI2cDriver(void){
+OledI2cDriver::OledI2cDriver(void){ // @suppress("Class members should be properly initialized")
 	// Clear screen by filling with black color
 	for(uint32_t i = 0; i < sizeof(buffer); i++){
 		buffer[i] = 0;
@@ -47,28 +47,31 @@ OledI2cDriver::OledI2cDriver(void){
 void OledI2cDriver::I2C_init(I2C_HandleTypeDef *hi2c){
 	i2c_handle = hi2c;
 
-    write_command(0xAE);   // Display off
-	write_command(0xC8);   // Set COM Output Scan Direction
-	write_command(0x10);   // Set high column address
-	write_command(0xA1);   // Set segment re-map 0 to 127
-	write_command(0x00);   // No offset
-	write_command(0xDB);   // Set vcomh
-	write_command(0x20);   // 0x20,0.77xVcc
-	write_command(0x8D);   // Set DC-DC enable
-	write_command(0x14);   //
-    write_command(0xAF);   // Turn on SSD1306 panel
+    write_command(0xAE);	// Display off
+	write_command(0xC8);	// Set COM Output Scan Direction
+	write_command(0x10);	// Set high column address
+	write_command(0xA1);	// Set segment re-map 0 to 127
+	write_command(0x00);	// No offset
+	write_command(0xDB);	// Set vcomh
+	write_command(0x20);	// 0x20,0.77xVcc
+	write_command(0x8D);	// Set DC-DC enable
+	write_command(0x14);	//
+    write_command(0xAF);	// Turn on SSD1306 panel
 
-    update_screen(); // Flush buffer to screen
+    for(uint8_t i=0; i < 8; i++) {
+    	update_screen(i); 		// Flush buffer to screen
+    }
 }
 
 
 //  Write the screenbuffer with changed to the screen
-void OledI2cDriver::update_screen(void){
-    for (uint8_t i = 0; i < 8; i++) {
-    	write_command(0xB0 + i);
+void OledI2cDriver::update_screen(uint8_t row){
+	if (row >= OLED_HEIGHT / 8) {
+		return; // Invalid line, return without doing anything
+	}
 
-        write_buffer(0x40, &buffer[OLED_WIDTH * i], OLED_WIDTH);
-    }
+	write_command(0xB0 + row);
+	write_buffer(0x40, &buffer[OLED_WIDTH * row], OLED_WIDTH);
 }
 
 
@@ -81,7 +84,7 @@ void OledI2cDriver::draw_pixel(uint8_t x, uint8_t y, OledColors color){
 	uint16_t index = x + (y / 8) * OLED_WIDTH;
 	uint8_t bit_mask = 1 << (y % 8);
 
-	if (color != 0) {
+	if (color != BLACK) {
 		buffer[index] |= bit_mask; // Set pixel
 	} else {
 		buffer[index] &= ~bit_mask; // Clear pixel
@@ -90,12 +93,12 @@ void OledI2cDriver::draw_pixel(uint8_t x, uint8_t y, OledColors color){
 
 
 //  Draw 1 char to the screen buffer
-char OledI2cDriver::write_char(char ch){
+void OledI2cDriver::write_char(char ch){
     uint32_t b;
 
     // Check remaining space on current line
     if (OLED_WIDTH <= (currentX + FONT_WIDTH) || OLED_HEIGHT <= (currentY + FONT_HEIGHT)) {
-        return 0; // Not enough space on current line
+        return; // Not enough space on current line
     }
 
     uint16_t idx;
@@ -122,27 +125,25 @@ char OledI2cDriver::write_char(char ch){
         }
     }
     currentX += FONT_WIDTH; // The current space is now taken
-
-    return ch; // Return written char for validation
 }
 
 
 //  Write full string to screenbuffer
-char OledI2cDriver::write_string(const char* str){
+void OledI2cDriver::write_string(const char* str){
     // Write until null-byte
-    while (*str){ // TODO: get rid of
-        if (write_char(*str) != *str){
-            return *str; // Char could not be written
-        }
+    while (*str){
+    	write_char(*str);
         str++; // Next char
     }
-
-    return *str; // Everything ok
 }
 
 
 //  Set cursor position
 void OledI2cDriver::set_cursor(uint8_t x, uint8_t y){
+	if(x > OLED_WIDTH || y > OLED_HEIGHT){
+		return;
+	}
+
 	currentX = x;
 	currentY = y;
 }

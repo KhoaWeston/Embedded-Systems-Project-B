@@ -17,23 +17,34 @@ Wave::Wave(Queue* q1, Queue* q2, LUTQueue* q3, Queue* q4){ // @suppress("Class m
 	is_in_follow_mode = false;
 	delay = DELAY_KNOB_STEPS;
 
+	initialize_parent();
+}
+
+
+void Wave::initialize_parent(void){
 	// Set external dependencies for each wave child
 	wave_ch1.initialize(ID_queue, &wave1_update_flag, &freq1_update_flag);
 	wave_ch2.initialize(ID_queue, &wave2_update_flag, &freq2_update_flag);
 
+	bool status = true;
+
 	// Initialize DAC with initial waveforms and parameters
-	LUT_DAC_queue->enqueue(LUT1, (uint32_t*)wave_ch1.get_active_wave_LUT());
-	LUT_DAC_queue->enqueue(LUT2, (uint32_t*)wave_ch2.get_active_wave_LUT());
-	DAC_queue->enqueue(FREQ1_1, wave_ch1.get_freq_Hz());
-	DAC_queue->enqueue(FREQ2_1, wave_ch2.get_freq_Hz());
+	status &= LUT_DAC_queue->enqueue(LUT1, (uint32_t*)wave_ch1.get_active_wave_LUT());
+	status &= LUT_DAC_queue->enqueue(LUT2, (uint32_t*)wave_ch2.get_active_wave_LUT());
+	status &= DAC_queue->enqueue(FREQ1_1, wave_ch1.get_freq_Hz());
+	status &= DAC_queue->enqueue(FREQ2_1, wave_ch2.get_freq_Hz());
 
 	// Initialize display with starting parameters
-	dis_queue->enqueue(AMP1_1, wave_ch1.get_amplitude());
-	dis_queue->enqueue(AMP2_1, wave_ch2.get_amplitude());
-	dis_queue->enqueue(TYPE1_1, wave_ch1.get_wave_type());
-	dis_queue->enqueue(TYPE2_1, wave_ch2.get_wave_type());
-	dis_queue->enqueue(FREQ1_2, wave_ch1.get_freq_Hz());
-	dis_queue->enqueue(FREQ2_2, wave_ch2.get_freq_Hz());
+	status &= dis_queue->enqueue(AMP1_1, wave_ch1.get_amplitude());
+	status &= dis_queue->enqueue(AMP2_1, wave_ch2.get_amplitude());
+	status &= dis_queue->enqueue(TYPE1_1, wave_ch1.get_wave_type());
+	status &= dis_queue->enqueue(TYPE2_1, wave_ch2.get_wave_type());
+	status &= dis_queue->enqueue(FREQ1_2, wave_ch1.get_freq_Hz());
+	status &= dis_queue->enqueue(FREQ2_2, wave_ch2.get_freq_Hz());
+
+	if(!status){
+		NVIC_SystemReset();
+	}
 }
 
 
@@ -47,7 +58,8 @@ void Wave::update_waves(void){
 	// Toggle follow mode
 	bool follow_mode_updated = ID_queue->dequeue(FOLLOW_0, follow_mode_change);
 	if(follow_mode_updated){
-		//assert(!(follow_mode_change == true || follow_mode_change == false));
+		ASSERT(follow_mode_change == MODE_ON || follow_mode_change == MODE_OFF);
+
 		is_in_follow_mode = (follow_mode_change == MODE_ON);
 		wave2_update_flag.set_flag();
 		freq2_update_flag.set_flag();
@@ -63,13 +75,13 @@ void Wave::update_waves(void){
 	// Adjust delay of wave 2 while in follow mode
 	bool delay_updated = ID_queue->dequeue(DEL_0, delay_change);
 	if(delay_updated){
-		//assert(!(delay_change == INC || delay_change == DEC));
+		ASSERT(delay_change == INC || delay_change == DEC);
+
 		if(delay_change == INC){
 			delay = (delay == DELAY_KNOB_STEPS) ? 1 : delay+1;
 		}else if(delay_change == DEC){
 			delay = (delay == 1) ? DELAY_KNOB_STEPS : delay-1;
 		}
-		wave2_update_flag.set_flag();
 		shift_follow_wave();
 
 		uint16_t delay_in_percent = static_cast<uint16_t>((delay / (float)DELAY_KNOB_STEPS) * 100);
@@ -91,6 +103,7 @@ void Wave::update_waves(void){
 	}
 	if(wave2_update_flag.is_flag_set()){
 		wave2_update_flag.reset_flag();
+//		bool amp_sent, type_sent;
 		if(is_in_follow_mode){
 			dis_queue->enqueue(AMP2_1, wave_ch1.get_amplitude());
 			dis_queue->enqueue(TYPE2_1, wave_ch1.get_wave_type());
@@ -140,8 +153,20 @@ void Wave::shift_follow_wave(void){
 	uint32_t* shifted_LUT = wave_ch2.get_active_wave_LUT();
 	uint16_t shift_idx = (delay / (float)DELAY_KNOB_STEPS) * LUT_SIZE;
 
-	for (uint16_t i = 0; i < LUT_SIZE; i++){
-		shifted_LUT[i] = base_LUT[(i + shift_idx) % LUT_SIZE];
+	if (shift_idx == 0) { // If shift_idx is zero, copy directly
+		for (uint16_t i = 0; i < LUT_SIZE; i++) {
+			shifted_LUT[i] = base_LUT[i];
+		}
+	}else{
+		// Handle the wraparound manually
+		uint16_t new_index;
+		for (uint16_t i = 0; i < LUT_SIZE; i++) {
+			new_index = i + shift_idx;
+			if (new_index >= LUT_SIZE) {
+				new_index -= LUT_SIZE; // Manually wrap around
+			}
+			shifted_LUT[i] = base_LUT[new_index];
+		}
 	}
 }
 
