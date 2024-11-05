@@ -17,8 +17,25 @@ class Button{
 		GPIO_TypeDef* port;
 		uint16_t pin;
 	public:
-		Button(GPIO_InitTypeDef* givenPort, uint16_t givenPin);
+		/**
+		 	* @brief constructor for class Button.
+		 	* initializes port and pin variables.
+		 	* @param x GPIOx pointer to a GPIO_TypeDef.
+		 	* @param x GPIO_Pin accepts macro to set pin.
+		 	* @return void.
+		 	*/
+		Button(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
+		/**
+		 	* @brief retrieves the input pin value,
+		 	* @param x void accepts no parameters.
+		 	* @return pin a uint16_t value associated with the gpio pin.
+		 	*/
 		int16_t getPin(void);
+		/**
+			* @brief reads the value of the input gpio pin.
+			* @param x void accepts no parameters
+			* @return HAL_GPIO_ReadPin(port,pin) the GPIO_PinState of corresponding pin
+			*/
 		GPIO_PinState state(void);
 };
 

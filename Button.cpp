@@ -7,16 +7,16 @@
 
 #include "Button.h"
 
-Button::Button(GPIO_TypeDef* givenPort, uint16_t givenPin){
-	port = givenPort;
-	pin = givenPin;
+Button::Button(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin){
+	port = GPIOx;
+	pin = GPIO_Pin;
 }
 
-Button::getPin(void){
+int16_t Button::getPin(void){
 	return pin;
 }
 
-Button::state(void){
+GPIO_PinState Button::state(void){
 	return HAL_GPIO_ReadPin(port,pin);
 }
 
