@@ -26,12 +26,19 @@ DisplayOutputDriver::DisplayOutputDriver(I2C_HandleTypeDef* i2c, Queue* q, Queue
 // Initialize the OLED
 void DisplayOutputDriver::initialize_display(void){
 	// Retrieve initial values for both channels
-	wave_queue->dequeue(AMP1_1, amp1);
-	wave_queue->dequeue(AMP2_1, amp2);
-	wave_queue->dequeue(TYPE1_1, wave_type1);
-	wave_queue->dequeue(TYPE2_1, wave_type2);
-	wave_queue->dequeue(FREQ1_2, freq1);
-	wave_queue->dequeue(FREQ2_2, freq2);
+	(void)wave_queue->dequeue(AMP1_1, amp1);
+	(void)wave_queue->dequeue(AMP2_1, amp2);
+	(void)wave_queue->dequeue(TYPE1_1, wave_type1);
+	(void)wave_queue->dequeue(TYPE2_1, wave_type2);
+	(void)wave_queue->dequeue(FREQ1_2, freq1);
+	(void)wave_queue->dequeue(FREQ2_2, freq2);
+
+	ASSERT(0 < amp1 && amp1 <= 3300);
+	ASSERT(0 < amp2 && amp2 <= 3300);
+	ASSERT(0 <= wave_type1 && wave_type1 <= 2);
+	ASSERT(0 <= wave_type2 && wave_type2 <= 2);
+	ASSERT(0 < freq1);
+	ASSERT(0 < freq2);
 
 	I2C_init(i2c_handle); // Initialize the OLED
 	display_wave_type();
@@ -39,7 +46,10 @@ void DisplayOutputDriver::initialize_display(void){
 	display_delay();
 	display_freq();
 	display_amp();
-	update_screen(); // Push updates to screen
+//	update_screen(); // Push updates to screen
+	for(uint8_t i=0; i < 8; i++) {
+		update_screen(i); 		// Flush buffer to screen
+	}
 }
 
 
@@ -104,7 +114,7 @@ void DisplayOutputDriver::update_display(){
 
 	// Refresh screen if any changes were made
 	if(needs_screen_update){
-		update_screen();
+//		update_screen();
 	}
 }
 
@@ -115,6 +125,7 @@ void DisplayOutputDriver::display_channel(){
 
 	set_cursor(90, 0);
 	write_string(("CH:"+std::to_string(curr_channel)).c_str());
+	update_screen(0);
 }
 
 
@@ -128,13 +139,14 @@ void DisplayOutputDriver::display_wave_type(){
 
 	set_cursor(0, 0);
 	write_string(("WAVE:"+wave_str).c_str());
+	update_screen(0);
 }
 
 
 // Display current frequency with one decimal place
 void DisplayOutputDriver::display_freq(){
 	uint32_t curr_freq = (curr_channel == 1) ? freq1 : freq2;
-	ASSERT(0 < curr_freq && curr_freq <= 62500);
+	ASSERT(0 < curr_freq);
 
 	std::string sel_arrow = (selected_mode == 1) ? ">" : "";
 	std::string f_str = std::to_string(curr_freq);
@@ -148,8 +160,9 @@ void DisplayOutputDriver::display_freq(){
 		f_str_dis = thousandths + "." + hundredths + "kHz ";
 	}
 
-	set_cursor(0, 20);
+	set_cursor(0, 16);
 	write_string((sel_arrow + "FREQ: " + f_str_dis).c_str());
+	update_screen(16/8);
 }
 
 
@@ -170,8 +183,9 @@ void DisplayOutputDriver::display_amp(){
 		a_str_dis = thousandths + "." + hundredths + "V  ";
 	}
 
-	set_cursor(0, 35);
+	set_cursor(0, 32);
 	write_string((sel_arrow + "AMP: " + a_str_dis).c_str());
+	update_screen(32/8);
 }
 
 
@@ -179,7 +193,7 @@ void DisplayOutputDriver::display_amp(){
 void DisplayOutputDriver::display_delay(){
 	ASSERT(0 < delay && delay <= 100);
 
-	set_cursor(0, 50);
+	set_cursor(0, 48);
 	if(curr_channel == 2){
 		std::string del_str;
 		if(!follow_mode){
@@ -192,5 +206,6 @@ void DisplayOutputDriver::display_delay(){
 	}else{
 		write_string("                "); // Write nothing
 	}
+	update_screen(48/8);
 }
 

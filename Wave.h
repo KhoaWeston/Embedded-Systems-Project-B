@@ -60,6 +60,7 @@ private:
 	uint8_t delay; 										// Horizontal offset in 45 degree increments for CH2 in follow mode
 
 	void shift_follow_wave(void);						// Shifts the wave 2 output LUT according to delay
+	void initialize_parent(void);
 public:
 	Wave(Queue*, Queue*, LUTQueue*, Queue*);			// Constructor initializes attributes and enqueues startup instructions to DAC and display
 	void update_waves(void); 							// Updates child waves and notifies DAC and display

@@ -27,7 +27,7 @@ enum OledColors{
 extern const uint16_t Font7x10[];
 
 
-class OledI2cDriver{
+class OledI2cDriver{ // @suppress("Miss copy constructor or assignment operator")
 private:
 	I2C_HandleTypeDef* i2c_handle;
 	uint16_t currentX;
@@ -37,13 +37,13 @@ private:
     void write_command(uint8_t );
     void write_buffer(uint8_t , uint8_t* , uint16_t );
 	void draw_pixel(uint8_t, uint8_t, OledColors);
-	char write_char(char);
+	void write_char(char);
 public:
 	// Function definitions
 	OledI2cDriver(void);
 	void I2C_init(I2C_HandleTypeDef*);
-	void update_screen(void);
-	char write_string(const char*);
+	void update_screen(uint8_t);
+	void write_string(const char*);
 	void set_cursor(uint8_t, uint8_t);
 };
 
