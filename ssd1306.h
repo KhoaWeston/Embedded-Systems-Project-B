@@ -1,8 +1,9 @@
 /*
- * This Library is written and optimized by Olivier Van den Eede(4ilo) in 2016
+ * This Library is inspired by Olivier Van den Eede(4ilo) work done in 2016
  * for Stm32 Uc and HAL-i2c lib's.
  *
- * To use this library with ssd1306 oled display you will need to customize the defines below.
+ * Additional inspiration was taken from ChatGPT for the write_buffer function
+ * but was later reformatted to meet project needs.
  */
 
 

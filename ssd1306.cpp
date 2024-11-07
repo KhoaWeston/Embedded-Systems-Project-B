@@ -8,30 +8,66 @@ void OledI2cDriver::write_command(uint8_t command) {
 }
 
 
-// ChatGPT aided
 void OledI2cDriver::write_buffer(uint8_t mem_addr, uint8_t* buff, uint16_t size) {
 	ASSERT(mem_addr >= 0x00 && mem_addr <= 0xFF);
 	ASSERT(buff != nullptr);
 	ASSERT(size > 0 && size <= 0xFFFF);
 
 	// Wait until I2C is ready
-	while (LL_I2C_IsActiveFlag_BUSY(i2c_handle->Instance));
+	bool flag = false;
+	for(uint16_t i=0; i < 2e+16; i++){
+		if(LL_I2C_IsActiveFlag_BUSY(i2c_handle->Instance)){
+			flag = true;
+			break;
+		}
+	}
+	if(!flag){
+		return;
+	}
 
 	// Start I2C transmission
 	LL_I2C_HandleTransfer(i2c_handle->Instance, I2C_ADDR, LL_I2C_ADDRSLAVE_7BIT, size + 1, LL_I2C_MODE_AUTOEND, LL_I2C_GENERATE_START_WRITE);
 
 	// Send the memory address
-	while (!LL_I2C_IsActiveFlag_TXE(i2c_handle->Instance));
+	flag = false;
+	for(uint16_t i=0; i < 2e+16; i++){
+		if(LL_I2C_IsActiveFlag_TXE(i2c_handle->Instance)){
+			flag = true;
+			break;
+		}
+	}
+	if(!flag){
+		return;
+	}
 	LL_I2C_TransmitData8(i2c_handle->Instance, mem_addr);
 
 	// Send the buffer data
+
 	for (uint16_t i = 0; i < size; i++) {
-		while (!LL_I2C_IsActiveFlag_TXE(i2c_handle->Instance));
+		flag = false;
+		for(uint16_t j=0; j < 2e+16; j++){
+			if(LL_I2C_IsActiveFlag_TXE(i2c_handle->Instance)){
+				flag = true;
+				break;
+			}
+		}
+		if(!flag){
+			return;
+		}
 		LL_I2C_TransmitData8(i2c_handle->Instance, buff[i]);
 	}
 
 	// Wait for the transfer to complete
-	while (!LL_I2C_IsActiveFlag_STOP(i2c_handle->Instance));
+	flag = false;
+	for(uint16_t i=0; i < 2e+16; i++){
+		if(LL_I2C_IsActiveFlag_STOP(i2c_handle->Instance)){
+			flag = true;
+			break;
+		}
+	}
+	if(!flag){
+		return;
+	}
 
 	// Clear the STOP flag
 	LL_I2C_ClearFlag_STOP(i2c_handle->Instance);
@@ -140,10 +176,13 @@ void OledI2cDriver::write_char(char ch){
 void OledI2cDriver::write_string(const char* str){
 	ASSERT(str != nullptr);
 
-	// Write until null-byte
-	while (*str){
+	uint8_t ctr = 0;
+
+	// Write until null-byte or too many characters
+	while(*str && ctr != 16){
 		write_char(*str);
 		str++; // Next char
+		ctr++;
 	}
 }
 

@@ -13,7 +13,7 @@
 
 #define LUT_SIZE       			(256) 			// Lookup table size (i.e. resolution)
 #define DAC_VALUE_MAX			(4096)			// Max DAC value
-#define VERT_OFFSET 			(25)			// Bottom and top offset to avoid clipping
+#define VERT_OFFSET 			(40)			// Bottom and top offset to avoid clipping
 #define MAX_FREQ				(1000)			// Max allowed frequency in Hz
 #define NUM_WAVE_TYPES 			(3)
 #define AMP_KNOB_STEPS			(10)			// Number of steps for amplitude knob
